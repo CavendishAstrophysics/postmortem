@@ -27,7 +27,7 @@ C  Alternatively, the complete set of cryo readings for all aerials can be
 C  printed out for any chosen sample.
 C
 C  The STATUS value should be zero on entry.
-C
+C (GP: 11 Aug 03)
 *-
        character  file*(*), plot_device*(*)
        integer    status
@@ -72,7 +72,7 @@ c
      :                                                     rmax,status)
            endif
 c
-         elseif (io_yesno('Do you want to plot readings? ','no',
+         elseif (io_yesno('Do you want to plot readings? ','yes',
      :                                                     status)) then
            option='PLOT'
          elseif (io_yesno('Do you want to display readings by sample?',

@@ -1,6 +1,6 @@
-*+PLOT_ALCS_RYLE
+*+plot_ifalcs_RYLE
 
-       subroutine plot_alcs_ryle (ifile, list, ilist, nae,
+       subroutine plot_ifalcs_ryle (ifile, list, ilist, nae,
      :                 isamp1, isamp2, max_value, plot_device, status)
 C      ---------------------------------------------------------------
 C
@@ -28,7 +28,7 @@ C  The plots are written to the current plot device.
 C
 C  The STATUS value should be zero on entry.
 C
-C  [DJT, 18/4/90; GP 2/1/02]
+C  [DJT, 18/4/90; GP 1/2/02]
 *-
        character  list*(*), plot_device*(*)
        real       max_value
@@ -63,7 +63,7 @@ c
 c
 c  Initialise plot header text
 c
-       text='Ae xx,  Front end ALC readings'
+       text='Ae xx,  IF ALC readings'
        call enq_path_comp(ifile,ra,dec,status)
        call mon_title(ifile,text,isamp1,isamp2,istep,ra,dec,header)
        header(3)(1:12)='Map centre'
@@ -79,7 +79,7 @@ c
            xx(n)=sid_time/36000.0
            do i=1,nae
              iae=ilist(i)
-             call enq_mon_agc( ifile, iae, yy(n,i), status )
+             call enq_mon_ifagc(ifile, iae, yy(n,i), status)
            enddo
          endif
        enddo
@@ -102,7 +102,7 @@ c         Plot graph
            call plot_setzeros( 'YES', status )
            call pgvport( vp(1,1), vp(2,1), 0.4, 0.8 )
            call plot_data( n, xx, yy(1,i), 1.0, 1.0, status )
-           call pglabel( 'ST (hrs)', 'Local Oscillator ALC', ' ' )
+           call pglabel( 'ST (h)', 'IF ALC', ' ' )
 c
 c         Plot title
            call pgvport( 0.1, 0.9, 0.85, 1.0 )

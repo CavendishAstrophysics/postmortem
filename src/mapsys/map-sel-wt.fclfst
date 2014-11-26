@@ -15,7 +15,6 @@ C         Status variable - must be zero on entry - otherwise error
 C
 C     Sets the map weighting function to one of the possible
 C     alternatives defined in (postmortem)weighting-types:incl
-C  rain-gauge weighting option (ex MEJ) added 9 May 2000: GP
 C
 C-
 C     ****************************************************************
@@ -23,13 +22,15 @@ C
 C     Global includes -
 C         ( i.e. Global constant, variable and common declarations )
 C
-      include        '/mrao/include/chrlib_functions.inc'
-      include        '/mrao/include/iolib_functions.inc'
-      include        '/mrao/include/iolib_errors.inc'
-      include        '/mrao/include/maplib_redtape.inc'
-      include        '/mrao/include/maplib_errors.inc'
-      include        '/mrao/post/include/mapsys_save.inc'
-      include        '/mrao/post/include/weighting_types.inc'
+      $list off
+      $include        (library)chrlib-functions:incl
+      $include        (library)iolib-functions:incl
+      $include        (library)iolib-errors:incl
+      $include        (library)maplib-redtape:incl
+      $include        (library)maplib-errors:incl
+      $include        (postmortem)mapsys-save:incl
+      $include        (postmortem)weighting-types:incl
+      $list on
 
 C     ****************************************************************
 C
@@ -55,38 +56,38 @@ C
 C         Main Code
 C         ---------
 C
-      call io_getopt( 'Weighting function type (?=list) : ',
+      call getopt( 'Weighting function type (?=list) : ',
      *              weight_types(mod(wghttp,10)),
      *              weight_types(0), num_weight+1,
      *              reply, s                      )
       if ( s .ne. 0 ) goto 9999
 
-      if (chr_chsame(reply, weight_types(no_weighting))) then
+      if ( chsame( reply, weight_types(no_weighting) ) ) then
           st_dev = 0.0
-      else if ( chr_chsame( reply, weight_types(super_smooth)) .or.
-     *          chr_chsame( reply, weight_types(noise_wt    ))) then
+      else if ( chsame( reply, weight_types(super_smooth) ) .or.
+     *          chsame( reply, weight_types(noise_wt    ) )      ) then
           if ((mod(wghttp,10) .eq. super_smooth) .or.
-     *        (mod(wghttp,10) .eq. noise_wt    )) then
+     *        (mod(wghttp,10) .eq. noise_wt    )       ) then
               st_dev = wghtpa(1)
           else
               st_dev = 0.0
           end if
           write(string,'(I2)') nint(st_dev*2+1)
-          call io_getr('Smooth box width : ', string, st_dev, s )
+          call getr('Smooth box width : ', string, st_dev, s )
           st_dev = max(0.0, min(3.0, int( abs( (st_dev-1)/2 ) )))
-      else if ( chr_chsame( reply, weight_types(radial_wt) )) then
+      else if ( chsame( reply, weight_types(radial_wt) ) ) then
           st_dev = 0.0
-      else if ( chr_chsame(reply,weight_types(gaussian_wt))     .or.
-     *          chr_chsame(reply,weight_types(radial_gauss_wt))) then
+      else if ( chsame(reply,weight_types(gaussian_wt))     .or.
+     *          chsame(reply,weight_types(radial_gauss_wt))      ) then
 
-          if (mod(wghttp,10).ne.gaussian_wt  .and.
-     *        mod(wghttp,10).ne.radial_gauss_wt ) then
+          if (mod(wghttp,10).ne.gaussian_wt     .and.
+     *        mod(wghttp,10).ne.radial_gauss_wt       ) then
               st_dev = 1.0/(1.5*sqrt(2.0*log(1.0/0.30)))
           else
               st_dev = wghtpa(1)
           end if
 
-          call io_getr(
+          call getr(
      *        'S.D. of gaussian (ratio of the aperture halfwidth) : ',
      *        '*', st_dev, s)
       else
@@ -94,26 +95,25 @@ C
           goto 9999
       end if
 
-      if (io_yesno( 'Apply a visibility cutoff ? ', 'No', s )) then
+      if (yesno( 'Apply a visibility cutoff ? ', 'No', s )) then
           cutoff = wghtpa(2)
-          call io_getr(
+          call getr(
      *        'Radius of cutoff (ratio of the aperture halfwidth) : ',
      *        '*', cutoff, s )
       else
           cutoff = 0.0
       end if
-      if (s .ne. 0) goto 9999
+      if ( s .ne. 0 ) goto 9999
 
-C Set up redtape parameters
+C     Set up redtape parameters
       do 100, i = 0, num_weight
-          if (chr_chsame( reply, weight_types(i) ) ) wghttp = i
+          if (chsame( reply, weight_types(i) ) ) wghttp = i
   100 continue
       wghtpa(1) = st_dev
       wghtpa(2) = abs(cutoff)
       if (wghtpa(2) .ne. 0.0) wghttp = wghttp+10
 
-      if (io_yesno('Weight visibilities by rain gauge ? ', 'Yes', s)) 
-     &  then
+      if (yesno('Weight visibilities by rain gauge ? ', 'Yes', s )) then
           wghttp = wghttp+20
       end if
 
@@ -132,3 +132,5 @@ C
           call ldredt( mapsys_save, 0 )
           return
       end
+
+C     *****************************************************************

@@ -24,7 +24,7 @@ C
 
 C PA, 9/05/90; 2000 fix GP 30/3/2000
 C GGP new format for gt file:  14 June 2001; 21 June 2001
-C new output format: 10 June 02
+C
 C-
 
        include '/mrao/post/include/global_constants.inc'
@@ -138,8 +138,7 @@ C and save record for checking mode operation
            datim(i+3) = gt_idat1(i)
          end do
        end if
-* brief, detailed, check:
-       if (mode.eq.1 .or. mode.eq.2 .or. mode.eq.3) then
+       if (mode.ne.4 .and. mode.ne.5) then
          call io_getdat('List from (date) : ', '*', datim(4), s)
          datim(1) = 0
          datim(2) = 0
@@ -151,25 +150,26 @@ C and save record for checking mode operation
          datim(2) = 59
          datim(3) = 23
          call util_datint(datim, date_high)
-* number
        else if (mode.eq.4) then
          call io_enqout(iout)
          write(iout,'('' Number-of-records '',I8)') gt_num_rec
          goto 999
-* single
        else if (mode.eq.5) then
          rec_num = gt_num_rec
          call io_geti('Entry-number : ','*',rec_num,s)
          rec_num = max(1,rec_num)
          rec_num = min(gt_num_rec,rec_num)
+         rec_num = rec_num
        end if
        call io_opeout(iout, s)
        if (s.ne.0) goto 999
        if (mode.eq.1 .or. mode.eq.3) then
          write (iout,100)
  100     format(1x/1x,'Record  ','Source                      ',
-     *                'date/time' /
-     *             1x, 60('-'))
+     *                'Position (1950.0)            ',
+     *                'Time/Date' /
+     *             1x,'----------------------------------------',
+     *                '----------------------------------------')
        end if
 
        n1 = 1
@@ -187,36 +187,25 @@ C and save record for checking mode operation
            if (mode.eq.1 .or. mode.eq.3) then
              string = ' '
              string(1:24) = gt_source(1:chr_lenb(gt_source))
-             string(26:27) = 'pa'
+             string(26:26) = 'P'
+             string(27:27) = 'A'
              if (gt_cal_no_phi) string(26:26) = ' '
              if (gt_cal_no_amp) string(27:27) = ' '
              if (gt_vis_soln)   string(28:28) = 'V'
-*             call frrads( 'HMS', gt_RA, ih, im, secs )
-*             write(string(30:41), '(I2.2,I3.2,F6.2)' ) ih, im, secs
-*             call frrads( 'DMS', gt_DEC, id, im, secs )
-*             write(string(43:55), '(I3.2,I3.2,F6.2)' ) id, im, secs
-*             write(string(58:71),
-*     *           '(I2,''.'',I2.2,'' '',I2,'':'',I2.2,'':'',I2.2)' )
-*     *             gt_itim1(3),gt_itim1(2),(gt_idat1(ii), ii=1,2),
-*     *             mod(gt_idat1(3), 100)
-*             write(iout,'(1X,I5,3X,A)') n,string(1:71)
-
-* date/time as yymmdd hh:mm
-
-              write (string(30:41), 7000)
-     &                  mod(gt_idat1(3),100),gt_idat1(2), gt_idat1(1),
-     &                  gt_itim1(3),gt_itim1(2)
-
- 7000      format (i2.2,i2.2,i2.2, x, i2.2,':',i2.2)
-
-              string(45:74) = gt_comment(1)
-              write(iout,'(1X,I5,X,A)') n,string(1:74)
-
-              if (mode.eq.3) then
-                call cal_gt_excheck(save_gt, gt_record, string, s)
-                ls = chr_lenb( string )
-                write( iout, '(1X,A,A)' ) '-- CHECK: ',string(1:ls)
-              end if
+             call frrads( 'HMS', gt_RA, ih, im, secs )
+             write( string(30:41), '(I2.2,I3.2,F7.2)' ) ih, im, secs
+             call frrads( 'DMS', gt_DEC, id, im, secs )
+             write( string(43:55), '(I3.2,I3.2,F7.2)' ) id, im, secs
+             write(string(58:71),
+     *           '(I2,''.'',I2.2,'' '',I2,'':'',I2.2,'':'',I2.2)' )
+     *             gt_itim1(3),gt_itim1(2),(gt_idat1(ii), ii=1,2),
+     *             mod(gt_idat1(3), 100)
+             write(iout,'(1X,I5,3X,A)') n,string(1:71)
+             if (mode.eq.3) then
+               call cal_gt_excheck(save_gt, gt_record, string, s)
+               ls = chr_lenb( string )
+               write( iout, '(1X,A,A)' ) '-- CHECK: ',string(1:ls)
+             end if
            else if (mode.eq.2.or.mode.eq.5) then
              string = ' '
              write(iout,'(1X/1X,''Record   : '',
@@ -244,7 +233,7 @@ C and save record for checking mode operation
      *      ''End-date   : '',I2,''.'',I2.2,2X,I2,'':'',I2.2,'':'',I4)')
      *            gt_itim2(3),gt_itim2(2),(gt_idat2(i), i=1,3)
              write(iout,'(1X,''Frequency  : '',F10.3,A)') gt_freq,
-     *             ' MHz (1st LO)'
+     *             ' MHz (nominal central frequency)'
              write(iout,'(1X,''- Sub-bands: '',5F10.3)') gt_subb_freq
              write(iout,'(1X,''- Channels : '',4F10.3)')
      *             (gt_chan_freq(i), i=1,4)

@@ -7,7 +7,7 @@ C
      *                            smooth_arr,
      *                            n1, n2,
      *                            weight,
-     *                            s                  )
+     *                            s )
 
 C
 C     Calculates the weights to be given to a buffer of uv positions.
@@ -49,6 +49,7 @@ C     4     - Radial*Gaussian weighting   w = r * e**( -r**2/sigma**2 )
 C             weight_param(1) = sigma
 C     10-15 - Same as above except a cutoff is applied at a radius of
 C             weight_param(2).
+C       +20 - apply rain-gauge weighting as well (RT)
 C
 C     Note that sigma and the cutoff refer to the aperture plane, not
 C     the equatorial plane (they are different for sky coordinates).
@@ -56,6 +57,7 @@ C     They are both expressed as a fraction of the aperture plane
 C     halfwidth measured along the axis.
 C
 C     NPR     8 December 1987.
+C     last mod:  GP 9 May 2000 
 C
 C-
 C     ****************************************************************
@@ -157,8 +159,9 @@ C
           goto 9999
       end if
 
-      if (weight_type .ne. prim_wt_type) then
-C         Apply cutoff
+      if (weight_type - prim_wt_type .eq. 10 .or.
+     *    weight_type - prim_wt_type .eq. 30) then
+C Apply cutoff
           max_r_sqr=weight_param(2)*weight_param(2)*real((n1-1)*(n1-1))
           do 700, i = 1, num_uv
               if ((uv(1,i)*uv(1,i)+uv(2,i)*uv(2,i)).gt.max_r_sqr) then

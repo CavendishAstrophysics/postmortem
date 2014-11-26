@@ -2,7 +2,8 @@ C$ Routines for Monitoring the solution to RT calibration
 C
 C
 C P. Alexander, MRAO, Cambridge.
-C
+* GGP 6 June 2001: removed command for changing GT files
+
 C+ cal_soln_monitor
 
        subroutine cal_soln_monitor( s )
@@ -29,9 +30,9 @@ C include control information
 C define commands available in the solution monitor
        integer       number_commands, icomm
        logical       exit_at_end
-       parameter    (number_commands = 9)
+       parameter    (number_commands = 8)
        character*80  liscom(number_commands), command_line
-       integer      cmd_report, len_cli, il
+       integer      cmd_report, len_cli
        parameter   (cmd_report = 1)
        data liscom(cmd_report)/
      * 'enable-report ....... enable/disable reports on the solution'
@@ -70,11 +71,6 @@ C define commands available in the solution monitor
        parameter   (cmd_report_write = 8)
        data liscom( cmd_report_write ) /
      * 'report-gt-write ..... toggle reporting of GT record written'
-     *               /
-       integer      cmd_set_gt_file
-       parameter   (cmd_set_gt_file = 9)
-       data liscom( cmd_set_gt_file ) /
-     * 'set-gt-files ........ define names of GT and GTvis files'
      *               /
 
 
@@ -143,19 +139,9 @@ C decode command
          end if
 
        else if (icomm.eq.cmd_report_write) then
-         gtopt_report_write = 
+         gtopt_report_write =
      *             io_onoff('Turn reporting on/off : ','on',s)
 
-       else if (icomm.eq.cmd_set_gt_file) then
-         if (chr_lenb(RT_gt_file).eq.0) then
-           RT_gt_file = def_RT_gt_file
-         end if
-         if (chr_lenb(RT_gtvis_file).eq.0) then
-           RT_gtvis_file = def_RT_gtvis_file
-         end if
-         call io_getwrd('GT-file : ',RT_gt_file,RT_gt_file,il,s)
-         call io_getwrd('GTvis-file : ',RT_gtvis_file,RT_gtvis_file,
-     *                                                           il,s)
 
        end if
 

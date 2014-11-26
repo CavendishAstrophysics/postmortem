@@ -169,7 +169,7 @@ C ... Update title for this spacing.
      *            ' Spacing ', isp,sub_bands(iba),ich,'; ',
      *            radii(ispac),'/\; Ae ',iae1,'/',iae2
 
-          call plot_complex(  title,
+          call plot_complexN(  title,
      *                        'Visibilities vs time',
      *                        'ST (hrs)',
      *                        vis_list(ispac,1),
@@ -177,7 +177,7 @@ C ... Update title for this spacing.
      *                        time,
      *                        plot_device,
      *                        plot_type,
-     *                        s                      )
+     *                        lsf_num, s)
 
         end do
 

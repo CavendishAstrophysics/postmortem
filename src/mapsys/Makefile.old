@@ -13,7 +13,6 @@ INCLUDE_FILES=\
 OBJECT_FILES=\
 	buffer_wt.o correct_map.o exm_print.o \
 	get_skew_angle.o get_smooth_array.o get_weight_buff.o \
-	get_rg_weight.o \
 	grade_aperture.o grid_vis_buff.o map_add_lsf.o \
 	map_chredt.o map_delete_lsf.o map_init_redtape.o \
 	map_plot.o map_save.o map_sel_bset.o map_sel_conv.o \

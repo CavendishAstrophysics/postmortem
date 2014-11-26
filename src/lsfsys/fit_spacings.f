@@ -193,7 +193,7 @@ C ... Update title for this spacing.
           call io_setout(termo)
 
           if (do_plot) then
-            call plot_complex(  title,
+            call plot_complexN(  title,
      *                          'Visibilities vs time',
      *                          'ST (hrs)',
      *                          vis_list(ispac,1),
@@ -201,7 +201,7 @@ C ... Update title for this spacing.
      *                          time,
      *                          plot_device,
      *                          plot_type,
-     *                          s                      )
+     *                          lsf_num, s)
           end if
 
         end do

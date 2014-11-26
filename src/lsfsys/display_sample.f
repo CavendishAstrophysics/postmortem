@@ -100,7 +100,7 @@ C ---------
           call lsf_get_radii( lsf_num, max_vis, radii, num_spac, s )
 
           call lsf_title( lsf_num, list, buff_num, -1, title, s )
-          call plot_complex(  title,
+          call plot_complexN(  title,
      *                        'Visibilities vs radius',
      *                        'Radius (wavelengths)',
      *                        vis_list,
@@ -108,7 +108,7 @@ C ---------
      *                        radii,
      *                        plot_device,
      *                        plot_type,
-     *                        s                      )
+     *                        lsf_num, s)
 
           buff_num = buff_num+samp_rate
       goto 100

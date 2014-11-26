@@ -1,11 +1,11 @@
 C+plot_data
 C
-      SUBROUTINE plot_data(   num_plot,
+      SUBROUTINE plot_data   (num_plot,
      *                        plot_x,
      *                        plot_y,
      *                        alt_scale_x,
      *                        alt_scale_y,
-     *                        s                      )
+     *                        s)
 
 C
 C     Plots data within a predefined PGPLOT window.
@@ -164,7 +164,7 @@ C         Plot the data.
 
 C         Plot fit if required
           if (plot_fit .and. plot_lower) then
-c           call lsf_enq_ADC( ratel, ADC, s )
+            call lsf_enq_ADC(ratel, ADC, s)
             do sp=1,num_plot
               ha = plot_x(sp)*const_2pi/24.0 - ratel
               plot_y(sp) = ADC(1)*cos(ha)+ADC(2)*sin(ha)+ADC(3)
@@ -178,10 +178,12 @@ c           call lsf_enq_ADC( ratel, ADC, s )
                 end do
               end if
             end do
+            call PGsci(2)
             call pgline(num_plot,plot_x,plot_y)
-            call chr_chrtoc( ADC(1), num1, ls )
-            call chr_chrtoc( ADC(2), num2, ls )
-            call chr_chrtoc( ADC(3), num3, ls )
+            call PGsci(1)
+            call chr_chrtoc (ADC(1), num1, ls )
+            call chr_chrtoc (ADC(2), num2, ls )
+            call chr_chrtoc (ADC(3), num3, ls )
             line1 = 'A = ' // num1
             line2 = 'D = ' // num2
             line3 = 'C = ' // num3

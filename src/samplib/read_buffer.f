@@ -90,9 +90,11 @@ c    *   data_offset,word_count,samp_len,buffer_len
      *                    buffer(buffer_ptr),
      *                    nword,
      *                    s )
-          if ( s .eq. -1) then
+
+          if (s .eq. -1 .or. s .eq. END_FILE) then
              s = END_FILE
           else if ( s .ne. 0 ) then
+             write (*,*) 'io_rdfile:',  lun, block_num, nword, s
              goto 999
           end if
 

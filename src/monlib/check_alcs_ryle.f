@@ -28,7 +28,7 @@ C  printed out for any chosen sample.
 C
 C  The STATUS value should be zero on entry.
 C
-C  (DJT, 5 Oct 93)
+C  (DJT, 5 Oct 93; GP, 11 Aug 03)
 *-
        character  file*(*), plot_device*(*)
        integer    status
@@ -73,7 +73,7 @@ c
      :                                                     rmax,status)
            endif
 c
-         elseif (io_yesno('Do you want to plot ALC values? ','no',
+         elseif (io_yesno('Do you want to plot ALC values? ','yes',
      :                                                     status)) then
            option='PLOT'
         elseif (io_yesno('Do you want to display ALC values by sample?',

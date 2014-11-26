@@ -1,6 +1,6 @@
 # Makefile for MRAO POSTMORTEM and related programs
 #
-# DJT, 9/7/92; GP/DJT 28 10 98, 26 Jan 99, 19 Mar 99, 1 Jun 99, 30 Mar 2000
+# DJT, 9/7/92; GP/DJT ... 9 May 2000
 
 FFLAGC=-u
 FCOMPL=f77
@@ -78,9 +78,10 @@ ion_correction : ion_program.o $(OBJECT_FILES) $(LIBRARY_FILES)
 mapper : mapping_program.o $(OBJECT_FILES) $(LIBRARY_FILES)
 	f77 -o mapper \
 	mapping_program.o mapsys.a \
-	-L/mrao/post/src -L/mrao/lib -llsf -lsamp -lmap -lplanet -lsla -lnag \
+	-L/mrao/post/src -L/mrao/lib -llsf -lsamp -lmap \
+	-lmon -lplanet -lsla -lnag \
 	-lfft -lcmd -lutil -lio -lch
-	mv mapper $(BINDIR)
+	mv mapper $(BINDIR)/mapper
 
 # object for remove sub-program
 

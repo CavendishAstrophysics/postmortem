@@ -11,8 +11,8 @@ C     Returned:
 C         Status variable - must be zero on entry - otherwise error
               integer             s
 C
-C     A status of ILL_REDTAPE is returned if there is no mapping
-C     redtape.
+C     Status ILL_REDTAPE is returned if there is no mapping redtape
+C last mod 30 May 2000 (GP)    
 C
 C-
 C     ****************************************************************
@@ -44,7 +44,8 @@ C
      *          (gradtp.ge.100 .and. gradtp.le.(num_grad+100)))  .or.
      *    (numlsf.lt.1 .or. numlsf.gt.maxlsf)     .or.
      *    .not.((wghttp.ge.0 .and.wghttp.le. num_weight)    .or.
-     *          (wghttp.ge.10.and.wghttp.le.(num_weight+10))    ))
+     *          (wghttp.ge.10.and.wghttp.le.(num_weight+10)).or. 
+     *          (wghttp.ge.20.and.wghttp.le.(num_weight+20))    ))
      *                                                   s = ill_redtape
 
       return

@@ -10,7 +10,8 @@ FCOMPL=f77
 INCLUDE_FILES=\
 
 OBJECT_FILES=\
-	plot_begin.o plot_complex.o plot_data.o \
+	plot_begin.o plot_complex.o plot_complexN.o \
+        plot_data.o \
 	plot_enqmode.o plot_getopts.o plot_set_fit.o \
 	plot_setmode.o plot_setpage.o plot_setscale.o \
 	plot_setvp.o plot_setzeros.o plot_vstats.o \

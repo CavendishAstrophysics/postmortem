@@ -183,7 +183,7 @@ C             Update title for this spacing.
               title(2)(lt:) = ' from '//list
 c             write(title(2)(lt:),'(A,A)') ' from ', list
 
-              call plot_complex(  title,
+              call plot_complexN(  title,
      *                            'Visibilities vs time',
      *                            'ST (hrs)',
      *                            merge_vis(group_num),
@@ -191,7 +191,7 @@ c             write(title(2)(lt:),'(A,A)') ' from ', list
      *                            time,
      *                            plot_device,
      *                            plot_type,
-     *                            s                      )
+     *                            lsf_num, s)
           end if
           group_num = group_num + 1
       goto 400

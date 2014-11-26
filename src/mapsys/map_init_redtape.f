@@ -1,7 +1,6 @@
-C
 C+map_init_redtape
 C
-      subroutine map_init_redtape( phys_sf_name, lsf_key, s )
+      subroutine map_init_redtape (phys_sf_name, lsf_key, s)
 C
 C     Initialises all the map redtape to reasonable defaults.
 C
@@ -26,15 +25,15 @@ C                       handled by the calling programs.
 C         Other       - system or MAPLIB error numbers
 C-
 C     ****************************************************************
-C
+
+* last mod GP 14 Feb 2002 (beamwidths)
+
 C     Function declarations
-C
+
       include '/mrao/include/chrlib_functions.inc'
 
-C     ****************************************************************
-C
-C     Common block includes - ( i.e. Global variable declaration. )
-C
+Common blocks, parameters 
+
       include '/mrao/include/constants.inc'
       include '/mrao/include/iolib_errors.inc'
       include '/mrao/include/maplib_redtape.inc'
@@ -51,10 +50,10 @@ C
 C     Constants - various map defaults.
 C         Map size.
               integer         x_size, y_size
-              parameter     ( x_size = 256 )
-              parameter     ( y_size = 256 )
+              parameter      (x_size = 256)
+              parameter      (y_size = 256)
               integer         data_type
-              parameter     ( data_type = 3 )
+              parameter      (data_type = 3)
 
 C     Variables, equivalences and commons
 C         Loop counter
@@ -80,42 +79,48 @@ C         Values of control table variables returned by enquiry routines
               integer         sf_poln
               integer         sf_tscope
               real*4          rt_freq
+              real*4          beam_widths(2)
 
 C     ****************************************************************
 C
 C     Function initialisation
-C
-      if ( s .ne. 0 ) return
-      call dpredt( mapsys_save, s )
+
+      if  (s .ne. 0) return
+      call dpredt (mapsys_save, s)
 
 
 C     Open the logical sample file to be used to make the map
-      call lsf_open( phys_sf_name, lsf_key, 'READ', lsf_num, s )
-      if ( s .ne. 0 ) goto 9999
+      call lsf_open (phys_sf_name, lsf_key, 'READ', lsf_num, s)
+      if  (s .ne. 0) goto 9999
 
 C     Call control table enquiry routines.
-      call lsf_enq_sf(      lsf_num, sf_unit, src_num, s )
-      call lsf_enq_numsp(   lsf_num, lsf_numsp, s )
-      call lsf_enq_max_rad( lsf_num, lsf_maxsp_wlen, s )
+      call lsf_enq_sf      (lsf_num, sf_unit, src_num, s)
+      call lsf_enq_numsp   (lsf_num, lsf_numsp, s)
+      call lsf_enq_max_rad (lsf_num, lsf_maxsp_wlen, s)
       call lsf_enq_pc_rdate(lsf_num,
-     *                      ref_date, ref_ra, ref_dec, lsf_source, s )
-      call enq_units(    sf_unit, sf_units, s )
-      call enq_freq(     sf_unit, sf_freq, s )
-      call enq_poln(     sf_unit, sf_poln, s )
-      call enq_point(    sf_unit, sf_ra_aes, sf_dec_aes, s )
-      call enq_path_comp(sf_unit, sf_ra_comp, sf_dec_comp, s )
-      call enq_pc_epoch( sf_unit, src_num,
-     *                   sf_epoch, sf_ra, sf_dec, string, s )
-      call enq_tscope(   sf_unit, string, sf_tscope, s )
+     *                      ref_date, ref_ra, ref_dec, lsf_source, s)
+      call enq_units    (sf_unit, sf_units, s)
+      call enq_freq     (sf_unit, sf_freq, s)
+      call enq_poln     (sf_unit, sf_poln, s)
+      call enq_point    (sf_unit, sf_ra_aes, sf_dec_aes, s)
+      call enq_path_comp(sf_unit, sf_ra_comp, sf_dec_comp, s)
+      call enq_pc_epoch (sf_unit, src_num,
+     *                   sf_epoch, sf_ra, sf_dec, string, s)
+      call enq_tscope   (sf_unit, string, sf_tscope, s)
 
 C     Close the logical sample file
       i = 0
-      call lsf_close( lsf_num, i )
-      if ( i .ne. 0 .and. s .eq. 0 ) s = i
-      if ( s .ne. 0 ) goto 9999
+      call lsf_close (lsf_num, i)
+      if  (i .ne. 0 .and. s .eq. 0) s = i
+      if  (s .ne. 0) goto 9999
 
-C     Set default sampling to an oversampling of 1.5
-      u_samp = 1.0D+0 / ( const_sa2r*2.0D+0*lsf_maxsp_wlen*1.5D+0 )
+C default sampling (arcsec)  (oversampling = 1.5)
+      u_samp = 1.0D+0 / (const_sa2r*2.0D+0*lsf_maxsp_wlen*1.5D+0)
+
+* beamwidths (arcsec): 1.5*(lambda/2D), 1.5*(lambda/2D)*cosec(dec)
+
+        beam_widths(1) = 0.75/(const_sa2r*lsf_maxsp_wlen)
+        beam_widths(2) = beam_widths(1)/sin(sf_dec)
 
 C     ****************************************************************
 C
@@ -123,10 +128,10 @@ C         Main Code
 C         ---------
 C
 C     call MAPLIB redtape setting routines.
-      call nwredt( x_size, y_size, data_type, sf_tscope,s)
-      call stmapj ( 1, u_samp, 0.0D+0, sf_epoch, 0.0D+0, s )
-      call stmapc( ref_ra, ref_dec, ref_date, sf_epoch, lsf_source, s )
-      if ( s .ne. 0 ) goto 9999
+      call nwredt (x_size, y_size, data_type, sf_tscope,s)
+      call stmapj  (1, u_samp, 0.0D+0, sf_epoch, 0.0D+0, s)
+      call stmapc (ref_ra, ref_dec, ref_date, sf_epoch, lsf_source, s)
+      if  (s .ne. 0) goto 9999
 
 
 C     Section 0 - Redtape format
@@ -141,28 +146,28 @@ C     Section 1 - Character title.
 C     ----------------------------
 
       if (sf_tscope.eq.1) then
-        call adredt( 'Instrument', 'CLFST 151MHz', s )
+        call adredt ('Instrument', 'CLFST 151MHz', s)
       else if (sf_tscope.eq.2) then
-        call adredt( 'Instrument', 'CLFST 38MHz', s )
+        call adredt ('Instrument', 'CLFST 38MHz', s)
       else if (sf_tscope.eq.3) then
-        call adredt( 'Instrument', 'VLB 81.5MHz', s )
+        call adredt ('Instrument', 'VLB 81.5MHz', s)
       else if (sf_tscope.ge.4 .and. sf_tscope.le.7) then
-        call adredt( 'Instrument', 'RYLE telescope', s )
+        call adredt ('Instrument', 'RYLE telescope', s)
       end if
 
 C     Source title set by call to stmapc
-      write( string, '( F8.2, '' MHz.'')') sf_freq/1.0D+6
-      call adredt( 'Frequency', string, s )
-      call adredt( 'Polarisation', 'Uncertain...', s )
-      write( string, '(I4)' ) lsf_numsp
-      call adredt( 'Spacings', string, s )
+      write (string, ' (F8.2, '' MHz.'')') sf_freq/1.0D+6
+      call adredt ('Frequency', string, s)
+      call adredt ('Polarisation', 'Uncertain...', s)
+      write (string, '(I4)') lsf_numsp
+      call adredt ('Spacings', string, s)
 C     Map size set by call to nwredt
 C     Projection set by call to stmapj
 C     Observation date set by call to stmapc
-      call chr_chdtos( sf_ra/const_h2r,  0, string, ls)
-      call chr_chdtos( sf_dec/const_d2r, 0, string(ls+1:), ls)
-      i = chr_intlc( string )
-      ls = chr_lenb( string )
+      call chr_chdtos (sf_ra/const_h2r,  0, string, ls)
+      call chr_chdtos (sf_dec/const_d2r, 0, string(ls+1:), ls)
+      i = chr_intlc (string)
+      ls = chr_lenb (string)
       if (string(i:i) .eq. '-') then
           write(rtitle(9),'(F6.1,2A)')
      *            obsdat, ' obs centre :HA',string(i+1:ls)
@@ -184,7 +189,7 @@ C     Section 3 - astronomical redtape
 C     --------------------------------
 
       rt_freq = sf_freq/1.0E+6
-      call sttype( rt_freq, sf_poln,
+      call sttype (rt_freq, sf_poln,
      *             'Flux Density    ',
      *              sf_units, s)
       exunit = sf_units
@@ -217,8 +222,12 @@ C     -----------------------------------------
       gradpa(2) = 0.0
 
 
-C     Section 5 - Derived quantities - not relevant to new maps
-C     ---------------------------------------------------------
+C     Section 5 - Derived quantities 
+C     ------------------------------
+
+* attempt to get CLEAN to make sensible guess [14 2 2002: GP]
+
+        call stbeam(1.0, beam_widths, 0.0, s)
 
 
 C     Section 6 - astrometric and mapper redtape
@@ -250,7 +259,7 @@ C     --------------------------------------
 C     Put in the details for the current logical sample file.
       numlsf = 1
       maxlsf = 10
-      call stmlsf( numlsf, phys_sf_name, lsf_key, s )
+      call stmlsf (numlsf, phys_sf_name, lsf_key, s)
 
       if (s.ne.0) goto 9999
       return
@@ -265,8 +274,8 @@ C
 C         Don't print error message if the error is NO_LSFSAVED
 C         Let the calling program handle it.
           if (s .ne. NO_LSFSAVED .or. s .ne. USR_BREAK) then
-              call map_wrerr( s, 'in subroutine MAP_INIT_REDTAPE' )
+              call map_wrerr (s, 'in subroutine MAP_INIT_REDTAPE')
           end if
-          call ldredt( mapsys_save, 0 )
+          call ldredt (mapsys_save, 0)
           return
       end

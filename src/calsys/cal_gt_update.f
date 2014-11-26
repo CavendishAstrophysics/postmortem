@@ -1,12 +1,12 @@
 C+ cal_gt_update
 
-       subroutine cal_gt_update( s )
-C      -----------------------------
+       subroutine cal_gt_update(s)
+C      ---------------------------
 C
 C Update the gains table by reading data from the GT file
 C
-C Returned:
-C   error status
+C Returned:  error status
+
        integer       s
 C
 C The user is prompted for the update option, record number in the
@@ -16,7 +16,7 @@ C
 C Record zero is the null record and consists of gains of (1,0).
 C
 C PA, 13/11/91
-C
+C GP new gain-file format  14 June 2001
 C-
 
        include '/mrao/post/include/global_constants.inc'
@@ -80,8 +80,8 @@ C prompt for option
      *              current_option, s)
        if (s.ne.0) goto 999
        ls = chr_lenb(current_option)
-       use_both = .false.
-       use_amp = .false.
+       use_both  = .false.
+       use_amp   = .false.
        use_phase = .false.
        if (chr_cmatch(current_option(1:ls),'read-correction')) then
          use_both = .true.
@@ -95,19 +95,23 @@ C prompt for option
 C set flag to indicate current gain table is being overwritten
        current_solution = .false.
 
-C open the gains table file
+C read the index then open the gains table file
        iprint = 0
-       nwd = 1024
-       bsize = 4*1024
-       call io_operan( iunit, RT_gt_file, 'READ', bsize, iprint, s )
-       call io_rdfile( iunit, 1, gt_times, nwd, s )
+       nwd = gt_blocksize
+       bsize = 4*gt_blocksize
+       call io_operan(iunit, RT_gt_index, 'READ', bsize, iprint, s)
+       call io_rdfile(iunit, 1, gt_index, nwd, s)
+       call io_close (iunit, s)
+       call io_operan(iunit, RT_gains, 'READ', bsize, iprint, s)
 
 C get record to read
 10     call io_geti('Record number : ', '0', num_rec, s )
        if (s.ne.0) goto 999
-       if (num_rec .lt. 0 .or. num_rec.gt.gt_num_rec .or.
-     *     gt_times(num_rec+1).eq.-1 ) then
-           call io_wrout('*** Illegal record number ' )
+       if (num_rec .lt. -1 .or. num_rec .gt. gt_num_rec) then
+           call io_wrout(' ... record number out of range')
+           goto 10
+       else if  (gt_index(num_rec+1) .eq. -1) then
+           call io_wrout(' ... this record has been deleted')
            goto 10
        end if
 
@@ -179,15 +183,15 @@ C .. AErials
 
          end if
 
-C .. increment i1 pointer
+
          i1 = i2 + 2
 
        end do
 
 C read record or initialise as required
        if (num_rec.gt.0) then
-         nwd = 1024
-         call io_rdfile( iunit, num_rec+1, gt_io, nwd, s )
+         nwd = gt_blocksize
+         call io_rdfile(iunit, num_rec, gt_io, nwd, s)
 C .. change gain table reference antenna
          if (current_refant.lt.0) then
            current_refant = gt_cal_refant
@@ -215,10 +219,10 @@ C ... read GT visibility-based solution
            iprint = 0
            nwd = 2560
            bsize = 4*2560
-           call io_operan( iunit_vis, RT_gtvis_file, 'READ',
-     *                  bsize, iprint, s )
-           call io_rdfile( iunit_vis, gt_vis_rec+1, gt_iovis, nwd, s )
-           call io_close( iunit_vis, s )
+           call io_operan(iunit_vis, RT_v_gains, 'READ',
+     *                  bsize, iprint, s)
+           call io_rdfile(iunit_vis, gt_vis_rec+1, gt_iovis, nwd, s)
+           call io_close (iunit_vis, s)
          else
            do i=1,max_vis
              gt_vis_gains(i) = (1.0,0.0)
@@ -229,7 +233,7 @@ C ... read GT visibility-based solution
          do iae = 1,max_RT_aes
            do isb = 1,max_subb
              do ich = 1,max_channel
-               gt_ae_gains( ich, isb, iae ) = (1.0,0.0)
+               gt_ae_gains(ich, isb, iae) = (1.0,0.0)
              end do
            end do
          end do
@@ -320,10 +324,10 @@ C copy solution to the gain table
 
        current_gains_table = .true.
 
-C take action on error
-999    if (s.ne.0) call cal_wrerr( s, 'in subroutine cal_gt_update' )
+C  errors?
 
-C close file
+999    if (s.ne.0) call cal_wrerr(s, 'in subroutine cal_gt_update')
+
        call io_close (iunit,s)
 
        end

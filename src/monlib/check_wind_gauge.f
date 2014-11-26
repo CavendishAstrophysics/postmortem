@@ -17,7 +17,7 @@ C
 C  The readings may also be plotted, within a selected sample range.
 C
 C  The STATUS value should be zero on entry.
-C
+C last mod:  GP  1 Aug 03
 *-
        character  file*(*), plot_device*(*)
        integer    status
@@ -52,7 +52,7 @@ c
            option='SCAN'
 c
          elseif(io_yesno('Do you want to plot the windspeed readings? ',
-     :                                                'no',status)) then
+     :                                               'yes',status)) then
            option='PLOT'
          endif
 c

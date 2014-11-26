@@ -20,7 +20,6 @@ C
 C     NPR     throughout 1987.
 C     PJW modified to include beamsets with integration-time smearing 8/91
 C     GP  9 May 2000: added MEJ code (1992!) for rain-gauge weighting
-C     GP  6 Feb 2003: hid some messages 
 C-
 C     ****************************************************************
 C
@@ -220,7 +219,7 @@ C     Initialise aperture and beam aperture arrays.
           rbuff(i) = 0.0
   100 continue
 
-*      call io_wrout( 'Calculating convolution function ...' )
+      call io_wrout( 'Calculating convolution function ...' )
       call tabfn(convtp, convos, convhw, convpa, max_conv_hw, conv, s)
       if ( s .ne. 0 ) goto 9999
 
@@ -384,13 +383,13 @@ C Eliminate null visibilities and make beams
      *                        s )
       call util_rdclck( int_cpu, int_elapsed )
 
-*      call io_wrout( 'Doing map fft ... ' )
+      call io_wrout( 'Doing map fft ... ' )
       call util_stclck
       call aper2map_fft( cbuff(aper_ptr), aper_cols, iymax, s )
       call util_rdclck( fft_cpu, fft_elapsed )
 
 C Apply the grid correction function and fft scaling correction.
-*      call io_wrout( 'Correcting map ...' )
+      call io_wrout( 'Correcting map ...' )
       call correct_map(   rbuff(map_ptr), ixmax, iymax,
      *                    convhw, convos, max_conv_hw, conv,
      *                    corrtp, .false., s    )
@@ -401,14 +400,14 @@ C Fill in the redtape.
       call adredt( 'Created', 'mapper', s )
 
 C Finally write the map away...
-*      call io_wrout( 'Writing the map away... ' )
+      call io_wrout( 'Writing the map away... ' )
       call wrredt( lun, 0, s )
       call wrmap( lun, rbuff(map_ptr), s )
       close ( lun )
       if ( s .ne. 0 ) goto 9999
 
       i = chr_lenb(map_name)
-      call io_wrout( 'Map ' // map_name(1:i) // ' has been made' )
+      call io_wrout( 'Map ' // map_name(1:i) // ' has been made.' )
 
 C Now see if a beam file exists.
       call io_brkfil( map_name, user, beam_name, type )
@@ -421,7 +420,7 @@ C  Beam file exists, make beam.
               cbuff(i) = cmplx(rbuff(beam_ptr+i-1), 0.0)
   800     continue
 
-*          call io_wrout( 'Doing beam fft ... ' )
+          call io_wrout( 'Doing beam fft ... ' )
           call util_stclck
           call aper2map_fft( cbuff(aper_ptr), aper_cols, iymax, s )
           call util_rdclck( cpu, elapsed )
@@ -429,7 +428,7 @@ C  Beam file exists, make beam.
           fft_elapsed = fft_elapsed + elapsed
 
 C Apply the grid correction function and fft scaling correction.
-*          call io_wrout( 'Correcting beam ...' )
+          call io_wrout( 'Correcting beam ...' )
           call correct_map(   rbuff(map_ptr), ixmax, iymax,
      *                        convhw, convos, max_conv_hw, conv,
      *                        corrtp, .false., s    )
@@ -441,7 +440,7 @@ C Fill in the redtape.
           call adredt( 'Created', 'mapper', s )
 
 C Finally write the map away...
-*          call io_wrout( 'Writing the beam away... ' )
+          call io_wrout( 'Writing the beam away... ' )
           call io_resfil( beam_name, nptot, .true., 0, s )
           call opemap( lun, beam_name, 'WRITE', 1, s )
           call wrredt( lun, 0, s )
@@ -450,19 +449,19 @@ C Finally write the map away...
           if ( s .ne. 0 ) goto 9999
 
           i = chr_lenb(beam_name)
-          call io_wrout('Beam ' // beam_name(1:i) // ' has been made')
+          call io_wrout('Beam ' // beam_name(1:i) // ' has been made.')
       else
           s = 0
       end if
 
-C  Write profiling statistics [suppressed 25 May 2000]
-*      if (smoo_cpu .ne. 0.0)
-*     *write( *,2000 ) 'Smoothing ..... -', smoo_cpu, smoo_elapsed
-*      write( *,2000 ) 'Gridding ...... -', int_cpu, int_elapsed
-*      write( *,2000 ) 'Transforming .. -', fft_cpu, fft_elapsed
-* 2000 format( 1H , 'Times for ', A, ' cpu ',F8.2, ', elapsed',F8.2 )
+C  Write profiling statistics
+      if (smoo_cpu .ne. 0.0)
+     *write( *,2000 ) 'Smoothing ..... -', smoo_cpu, smoo_elapsed
+      write( *,2000 ) 'Gridding ...... -', int_cpu, int_elapsed
+      write( *,2000 ) 'Transforming .. -', fft_cpu, fft_elapsed
+ 2000 format( 1H , 'Times for ', A, ' cpu ',F8.2, ', elapsed',F8.2 )
 
-*      call io_wrout( ' ' )
+      call io_wrout( ' ' )
       call io_wrout( ' ' )
 
       return

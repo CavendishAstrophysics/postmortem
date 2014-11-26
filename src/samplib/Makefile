@@ -19,7 +19,7 @@ OBJECT_FILES=\
 	enq_iba_freq.o enq_ich_code.o enq_ich_freq.o enq_integ.o \
 	enq_namfil.o enq_ion_corr.o enq_ion_name.o enq_ion_num.o \
 	enq_isp_code.o enq_loc_time.o enq_max_point.o \
-	enq_mjd_st0.o enq_numcorr.o \
+	enq_mjd_st0.o enq_mjdstart.o enq_numcorr.o \
 	enq_numsamp.o enq_numsp.o enq_numsrc.o enq_numvis.o \
 	enq_obsdef.o enq_off_tables.o enq_offsets.o enq_pages.o \
 	enq_path_comp.o enq_pc_epoch.o enq_phys_tscope.o enq_point.o \
@@ -55,7 +55,8 @@ OBJECT_FILES=\
 	exs_print_clfst.o exs_print_ryle.o exs_read.o \
 	find_sources.o get_aerials.o get_huts.o get_merge.o get_sf_pack.o \
 	get_source.o get_spacings.o mean_spac.o merge_vis_buffer.o \
-	open_sf.o open_source.o open_srckey.o put_sf_pack.o read_buffer.o \
+	next_sample_file.o \
+        open_sf.o open_source.o open_srckey.o put_sf_pack.o read_buffer.o \
 	read_ct.o read_ion_corr.o read_ion_ct.o read_monitor.o \
 	read_rt.o read_rt_sid.o read_sample.o read_sample_sid.o \
 	read_zero_corr.o rfile_log.o scan_source_list.o \

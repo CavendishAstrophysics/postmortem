@@ -25,7 +25,7 @@ C  Alternatively, the complete set of readings for all aerials can be
 C  displayed for any chosen sample.
 C
 C  The STATUS value should be zero on entry.
-C
+C (11 Aug 03: GP)
 *-
        character  file*(*), plot_device*(*)
        integer    status
@@ -70,7 +70,7 @@ c
            endif
 c
          elseif (io_yesno('Do you want to plot parameter readings? ',
-     :                                                'no',status)) then
+     :                                               'yes',status)) then
            option='PLOT'
          elseif (io_yesno('Do you want to display readings by sample?',
      :                                                'no',status)) then

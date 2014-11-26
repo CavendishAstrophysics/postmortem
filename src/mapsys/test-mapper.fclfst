@@ -1,0 +1,2139 @@
+C     Enforce explicit type checking
+
+      $implicit off
+
+C     *****************************************************************
+C
+C+mapper
+C
+      subroutine mapper ( map_name,
+     *                    s                      )
+
+C
+C     Makes a map using the redtape in the specified file.
+C
+C     Given:
+C         Full Sintran map file name.
+              character*(*)       map_name
+C
+C     Returned:
+C         Status variable - must be zero on entry - otherwise error
+              integer             s
+C
+C     Opens the file given by map_name, which must be a valid map file,
+C     and makes a map from the definition in the map red tape.
+C
+C     NPR     throughout 1987.
+C     PJW modified to include beamsets with integration-time smearing 8/91
+C-
+C     ****************************************************************
+C
+C     Function declarations -
+C
+      $include        (library)chrlib-functions:incl
+C
+C     ****************************************************************
+C
+C     Global includes -
+C         ( i.e. Global constant, variable and common declarations )
+C
+      $list off
+      $include        (library)constants:incl
+      $include        (library)maplib-redtape:incl
+      $include        (library)maplib-errors:incl
+      $include        (postmortem)global-constants:incl
+      $include        (postmortem)weighting-types:incl
+      $list on
+
+C     ****************************************************************
+C
+C     Local constant and variable declarations
+C
+C     Constants
+C         Maximum size of aperture and map array.
+              integer         max_buff_size
+              parameter     ( max_buff_size = 4*(513*1024) )
+C         Convolution function half width.
+              integer         max_conv_hw
+              parameter     ( max_conv_hw = 400 )
+
+C     Variables, equivilances and commons
+C         Loop counters
+              integer         i, j, k
+C         Real, complex and integer declarations of the workspace.
+              real            rbuff( max_buff_size   )
+              complex         cbuff( max_buff_size/2 )
+              integer         ibuff( max_buff_size   )
+              equivalence   ( rbuff, cbuff )
+              equivalence   ( rbuff, ibuff )
+C         Pointers within these buffers to the start of the map,
+C         aperture, beam aperture and super-smooth weighting arrays.
+              integer         map_ptr, aper_ptr, beam_ptr, smooth_ptr
+C         Pointer in the buffer to the start of a work array
+              integer         work_ptr
+C         Number of elements and columns in the aperture half plane.
+              integer         aper_size, aper_cols
+C         Tabulated convolution function.
+              real            conv( -max_conv_hw:max_conv_hw )
+C         Current sample file name and lsf key.
+              character*80    file_name
+              integer         lsf_key
+C         Current lsf number and number of buffers in lsf.
+              integer         lsf_num, num_buff, lsf_source
+C         Current number of visibilities in buffer
+              integer         num_vis
+C         Number of valid visibilities in buffer
+              integer         val_vis
+C         Visibility buffer
+              complex         vis( max_vis )
+C         UV coordinate buffer for visibilities
+              real            uv( 2, max_vis )
+C         Weights for each visibility.
+              real            weight( max_vis )
+C         Table of aerial pairs for each visibility
+              integer         samp_aes( max_vis, 2 )
+C         Pair of aerials
+              integer         ae1, ae2
+C         List of aerial system temperatures
+              real            Tsys( max_aes )
+C         Nominal rain gauge value
+              real            nominal_rg
+C         Overall weight of aperture due to rain gauge weighting
+              real            rg_weight
+C         UV plane skew angle
+              real*8          skew_angle
+C         Map statistics from maplib routine SCNMAP
+              real            stats(4)
+              integer         posns(4)
+C         Number of gridpoints/wavelength in u and v
+              real            uwl2gp, vwl2gp
+C         Map fortran logical unit number and default output unit
+              integer         lun, out
+C         Sample file logical unit number
+              integer         slun
+C         Beam file name, and map name user and type
+              character       beam_name*64, user*33, type*4
+C         String and length
+              character*47    string
+              integer         ls
+C         Model definition variables
+              real*8          u, v, ra, dec
+              complex         model_vis( max_vis )
+C         Runtime statistics and times.
+              integer         tot_val, tot_vis
+              real*4          cpu, elapsed
+              real*4          fft_cpu, fft_elapsed
+              real*4          int_cpu, int_elapsed
+              real*4          smoo_cpu, smoo_elapsed
+C         Execution mode information
+              character*16    current_user
+              integer         exe_mode, termno
+
+
+C     ****************************************************************
+C
+C     Subroutine initialisation
+C
+C     Check for non zero entry status
+      if ( s .ne. 0 ) return
+
+C     Find execution mode
+      call enqexe( current_user, exe_mode, termno )
+C     Initialise redtape to minimalist valuse to avoid OPEMAP problems
+      call nwredt( 1, 2, 2, 3, 1, s )
+
+      call wrout( 'Warning, test version' )
+
+C     Open map and read map redtape.
+      call opemap( lun, map_name, 'WRITE', 0, s )
+      call rdredt( lun, 1, 0, s )
+      if ( s .ne. 0 ) goto 9999
+
+C     Check to see that the map dimensions are powers of two.
+      if ( (nint(2.0**real(nint(alog2(real(ixmax))))) .ne. (ixmax)) .or.
+     *     (nint(2.0**real(nint(alog2(real(iymax))))) .ne. (iymax)  )  )
+     *                                                      then
+          s = ILL_REDTAPE
+          goto 9999
+      end if
+
+C     Check to see there is enough space to make this map.
+      aper_cols = ixmax/2+1
+      aper_size = aper_cols*iymax
+      if ( mod(wghttp,10) .eq. super_smooth .or.
+     *     mod(wghttp,10) .eq. noise_wt          ) then
+          if ( (aper_size*4) .gt. max_buff_size ) s = ARR_TOOSMALL
+      else
+          if ( (aper_size*3) .gt. max_buff_size ) s = ARR_TOOSMALL
+      end if
+
+C     Set up buffer pointers.
+      map_ptr    = 1
+      aper_ptr   = 1
+      work_ptr   = 1
+      beam_ptr   = map_ptr   + aper_size*2
+      smooth_ptr = beam_ptr  + aper_size
+
+C     Initialise timing variables
+      smoo_cpu    = 0.0
+      smoo_elapsed= 0.0
+      int_cpu     = 0.0
+      int_elapsed = 0.0
+      fft_cpu     = 0.0
+      fft_elapsed = 0.0
+
+C     Set up projection parameters.
+      if ( iproj .eq. 1 ) then
+C         Equatorial projection
+          uwl2gp = real(ixmax) * usamp * const_sa2r
+          vwl2gp = real(iymax) * usamp * const_sa2r
+      else if (   iproj.eq.2          .and.
+     *            skew.eq.0.0D+0      .and.
+     *            epoch.eq.obsdat     .and.
+     *            -iumap1.eq.iumap2+1 .and.
+     *            ivmap1.eq.-ivmap2+1         ) then
+C         Standard, central, sky projection
+          uwl2gp = real(ixmax) * usamp * const_sa2r
+          vwl2gp = real(iymax) * usamp * const_sa2r * dsin( decobs )
+      else
+          s = ILL_REDTAPE
+          goto 9999
+      end if
+
+
+C     ****************************************************************
+C
+C         Main Code
+C         ---------
+C
+      if ( mod(wghttp,10) .eq. super_smooth .or.
+     *     mod(wghttp,10) .eq. noise_wt          ) then
+          call wrout( 'Calculating super-smooth weighting array ...' )
+          call stclck
+          call get_smooth_array(  rbuff(smooth_ptr),
+     *                            aper_cols, iymax,
+     *                            uwl2gp, vwl2gp,
+     *                            wghttp, wghtpa,
+     *                            ibuff(work_ptr),
+     *                            s                  )
+          call rdclck( smoo_cpu, smoo_elapsed )
+      end if
+
+C     Initialise aperture and beam aperture arrays.
+      do 100, i = 1, aper_size*3
+          rbuff(i) = 0.0
+  100 continue
+      rg_weight = 0.0
+
+      call wrout( 'Calculating convolution function ...' )
+      call tabfn( convtp, convos, convhw, convpa, max_conv_hw, conv, s)
+      if ( s .ne. 0 ) goto 9999
+
+      string(1:)    = 'Gridding'
+      call stclck
+
+      do 700, i = 1, numlsf
+          call enmlsf( i, file_name, lsf_key, s )
+          string(11:26) = file_name
+          string(28:47) = '>-------------------'
+          if (exe_mode.eq.0) then
+            call wrout( string )
+          else
+            call wrout( string(1:27) )
+          end if
+          call lsf_open( file_name, lsf_key, 'RC', lsf_num, s )
+          call lsf_enq_numbuff( lsf_num, num_buff, s )
+          tot_vis = 0
+          tot_val = 0
+
+C         Find the effective UV plane skew angle for this LSF
+C         - this also sets the phase centre of the LSF
+          call get_skew_angle( lsf_num, skew_angle, s )
+
+C         If map is a beam-set define model LSF.
+          if (maptyp .eq. 3) then
+C          Turn off/on bandwidth smearing and primary beam if necessary.
+C                 & integration-time smearing
+              if (ibit(bsetfw,1).eq.0) then
+                  call lsf_set_bandpass( lsf_num, 1, 0.0, s )
+              else
+                  call lsf_set_bandpass( lsf_num, 1,
+     *                                    effective_bandwidth, s )
+              endif
+              if (ibit(bsetfw,2).eq.0) then
+                  call lsf_set_pbeam( lsf_num, .false., s )
+              else
+                  call lsf_set_pbeam( lsf_num, .true., s )
+              endif
+              if (ibit(bsetfw,3).eq.0) then
+                  call lsf_set_integt( lsf_num, 0.0, s )
+              else
+                  call lsf_set_integt( lsf_num,
+     *                                 effective_integration, s )
+              endif
+C             Add in sources.
+              do 300, u = u0set, u0set+duset*(nuset-1), duset
+                  do 200, v = v0set, v0set+dvset*(nvset-1), dvset
+                      call uvtord( u, v, ra, dec, s )
+                      call lsf_add_source(lsf_num, 1,epoch,ra,dec,1.0,s)
+  200             continue
+  300         continue
+          end if
+          if ( s .ne. 0 ) goto 9999
+
+C     Look up aerial system temperatures
+          call lsf_enq_sf(lsf_num, slun, lsf_source, s)
+          call enq_tsys(slun, Tsys, nominal_rg, s)
+
+C     Set up table of aerial pairs for each visibility
+          do 550, j = 1, max_vis
+              call lsf_enq_ae_vis( lsf_num, j, ae1, ae2, s)
+              samp_aes( j, 1 ) = ae1
+              samp_aes( j, 2 ) = ae2
+  550     continue
+
+
+          do 600, j = 1, num_buff
+              if ( imod(j, max(1,int(num_buff/20))) .eq. 0 ) then
+                  ls = lend( string, '>' )
+                  string(ls+1:ls+2) = '->'
+                  if (exe_mode.eq.0) write(1,'(''+'',A)') string
+              end if
+
+              call lsf_set_buffer( lsf_num, j, s )
+              call lsf_get_vis( lsf_num,
+     *                          max_vis,
+     *                          vis,
+     *                          num_vis,
+     *                          s          )
+              call lsf_get_uv( lsf_num,
+     *                         max_vis,
+     *                         skew_angle,
+     *                         uv,
+     *                         num_vis,
+     *                         s          )
+              call user_action(num_vis, vis,
+     *                         lsf_num, j, num_buff, s )
+              if ( s .ne. 0 ) goto 9999
+
+              if (maptyp .eq. 3) then
+C                 Beamset - get model visibilities.
+                  call lsf_set_buffer( lsf_num, j, s )
+                  call lsf_get_model( lsf_num,
+     *                                max_vis,
+     *                                model_vis,
+     *                                num_vis,
+     *                                s          )
+              end if
+
+C             Rescale u and v positions
+              do 400 k = 1, num_vis
+                  uv( 1, k ) = uv( 1, k ) * uwl2gp
+                  uv( 2, k ) = uv( 2, k ) * vwl2gp
+  400         continue
+
+              call get_weight_buff(   num_vis,
+     *                                vis, uv,
+     *                                wghttp, wghtpa,
+     *                                rbuff( smooth_ptr ),
+     *                                aper_cols, iymax,
+     *                                weight,
+     *                                s                  )
+
+              call get_rg_weight(     num_vis,
+     &                                 wghttp,
+     &                                 lsf_num,
+     &                                 max_vis,
+     &                                 samp_aes,
+     &                                 Tsys, j,
+     &                                 nominal_rg,
+     &                                 weight,
+     &                                 rg_weight,
+     &                                 s           )
+
+
+C             Eliminate null visibilities and make beams
+              val_vis = 0
+              do 500, k = 1, num_vis
+                  if ( vis( k ) .ne. ( 0.0, 0.0 ) ) then
+                      val_vis = val_vis + 1
+                      uv( 1, val_vis ) = uv( 1, k )
+                      uv( 2, val_vis ) = uv( 2, k )
+                      weight( val_vis )= weight( k )
+                      if (maptyp .eq. 1) then
+                          vis(val_vis) = vis( k )
+                      else if (maptyp .eq. 2) then
+                          vis(val_vis) = (1.0, 0.0)
+                      else
+                          vis(val_vis) = model_vis( k )
+                      end if
+                  end if
+  500         continue
+              tot_vis = tot_vis + num_vis
+              tot_val = tot_val + val_vis
+
+              call grid_vis_buff( vis,
+     *                            uv,
+     *                            val_vis,
+     *                            cbuff(aper_ptr),
+     *                            aper_cols, iymax,
+     *                            convhw, convos, conv, max_conv_hw,
+     *                            weight,
+     *                            rbuff(beam_ptr),
+     *                            s                  )
+  600     continue
+
+          call lsf_close( lsf_num, s )
+          if ( s .ne. 0 ) goto 9999
+
+          write(1,'(X,A,I8,A,I8,A, F7.2,A)' )
+     *        'Valid visibilities :', tot_val, ' out of ', tot_vis,
+     *        ' - ', (100.0*real(tot_val)/tot_vis), '%.'
+  700 continue
+
+      call grade_aperture(    cbuff( aper_ptr ),
+     *                        aper_cols, iymax,
+     *                        uwl2gp, vwl2gp,
+     *                        gradtp, gradpa,
+     *                        rbuff( beam_ptr ), 1,
+     *                        s                        )
+
+      call rdclck( int_cpu, int_elapsed )
+
+      call wrout( 'Doing map fft ... ' )
+      call stclck
+      call aper2map_fft( cbuff(aper_ptr), aper_cols, iymax, s )
+      call rdclck( fft_cpu, fft_elapsed )
+
+C     Apply the grid correction function and fft scaling correction.
+      call wrout( 'Correcting map ...' )
+      call correct_map(   rbuff(map_ptr), ixmax, iymax,
+     *                    convhw, convos, max_conv_hw, conv,
+     *                    corrtp, .false., s    )
+
+C     Fill in the redtape.
+      call scnmap( rbuff(map_ptr), uvmapw, stats, posns, s )
+      call stscal( stats, posns, s )
+      call adredt( 'Created', 'mapper', s )
+
+C     Finally write the map away...
+      call wrout( 'Writing the map away... ' )
+      call wrredt( lun, 1, 0, s )
+      call wrmap( lun, rbuff(map_ptr), s )
+      close ( lun )
+      if ( s .ne. 0 ) goto 9999
+
+      i = lenb(beam_name)
+      call wrout( 'Map ' // map_name(1:i) // ' has been made.' )
+
+C     Now see if a beam file exists.
+      call brkfil( map_name, user, beam_name, type )
+      call makfil( user, beam_name, 'beam', file_name, ls )
+      call namfil( file_name, beam_name, 0, s )
+
+      if (s .eq. 0 .and. maptyp.eq.1) then
+C         Beam file exists, make beam.
+          do 800, i = 1, aper_size
+              cbuff(i) = cmplx(rbuff(beam_ptr+i-1), 0.0)
+  800     continue
+
+          call wrout( 'Doing beam fft ... ' )
+          call stclck
+          call aper2map_fft( cbuff(aper_ptr), aper_cols, iymax, s )
+          call rdclck( cpu, elapsed )
+          fft_cpu     = fft_cpu     + cpu
+          fft_elapsed = fft_elapsed + elapsed
+
+C         Apply the grid correction function and fft scaling correction.
+          call wrout( 'Correcting beam ...' )
+          call correct_map(   rbuff(map_ptr), ixmax, iymax,
+     *                        convhw, convos, max_conv_hw, conv,
+     *                        corrtp, .false., s    )
+
+C         Fill in the redtape.
+          maptyp = 2
+          call scnmap( rbuff(map_ptr), uvmapw, stats, posns, s )
+          call stscal( stats, posns, s )
+          call adredt( 'Created', 'mapper', s )
+
+C         Finally write the map away...
+          call wrout( 'Writing the beam away... ' )
+          call resfil( beam_name, nptot, .true., 0, s )
+          call opemap( lun, beam_name, 'WRITE', 1, s )
+          call wrredt( lun, 1, 0, s )
+          call wrmap( lun, rbuff(map_ptr), s )
+          close ( lun )
+          if ( s .ne. 0 ) goto 9999
+
+          i = lenb(beam_name)
+          call wrout( 'Beam ' // beam_name(1:i) // ' has been made.' )
+      else
+          s = 0
+      end if
+
+C     Write profiling statistics
+      if (smoo_cpu .ne. 0.0)
+     *write( 1,2000 ) 'Smoothing ..... -', smoo_cpu, smoo_elapsed
+      write( 1,2000 ) 'Gridding ...... -', int_cpu, int_elapsed
+      write( 1,2000 ) 'Transforming .. -', fft_cpu, fft_elapsed
+ 2000 format( 1H , 'Times for ', A, ' cpu ',F8.2, ', elapsed',F8.2 )
+
+      call wrout( ' ' )
+      call wrout( ' ' )
+
+      return
+
+C     ****************************************************************
+C
+C         Error Handling
+C         --------------
+C
+ 9999 continue
+          call map_wrerr( s, 'in subroutine MAPPER' )
+          return
+      end
+C     Enforce explicit type checking
+
+      $implicit off
+
+C     *****************************************************************
+C
+C+get_smooth_array
+C
+      SUBROUTINE get_smooth_array(    smooth_arr,
+     *                                n1, n2,
+     *                                uwl2gp, vwl2gp,
+     *                                weight_type, weight_params,
+     *                                work,
+     *                                s                  )
+
+C
+C     Returns the aperture plane super-smooth weighting array.
+C
+C     Given:
+C         Aperture size.
+              integer             n1, n2
+C         The number of gridpoints per wavelength in u and v.
+              real                uwl2gp, vwl2gp
+C         Smooth type
+              integer             weight_type
+C         Smooth parameters
+              real                weight_params(*)
+C         Work space - must be twice the size of the smoothing array
+              real*8              work( n1, n2 )
+C
+C     Returned:
+C         The super-smooth weighting array - (0,0) is at (n1,n2/2+1)
+              real                smooth_arr( n1, n2 )
+C         Status value - must be zero on entry.
+              integer             s
+C
+C     Generates a super-smooth weighting array for use with the
+C     visibility data and map information defined in the current map
+C     redtape.
+C
+C     The weighting array has the same number of elements as the
+C     aperture array but is ordered with the direction of the second
+C     index in the opposite direction to the conventional arrangement
+C     for an aperture. Thus, the value of v increases as you move
+C     forwards through the array, that being the conventional FORTRAN
+C     way. The weight to be given to a particular visibility point is
+C     given by the value of nearest pixel in the weighting array.
+C
+C     The weighting types are given in (postmortem)weighting-types:incl.
+C
+C     NPR.    7 November 1987.
+C
+C-
+C     ****************************************************************
+C
+C     Function declarations -
+C
+      $include        (library)chrlib-functions:incl
+
+C     ****************************************************************
+C
+C     Global includes -
+C         ( i.e. Global constant, variable and common declarations )
+C
+      $list off
+      $include        (library)maplib-redtape:incl
+      $include        (library)maplib-errors:incl
+      $include        (postmortem)global-constants:incl
+      $include        (postmortem)weighting-types:incl
+      $list on
+
+C     ****************************************************************
+C
+C     Variables, equivilances and commons
+C         Loop counters
+              integer         i, j, k
+C         Integral values of u and v
+              integer         iu, iv
+C         The row and column of the (0,0) element
+              integer         zero_row, zero_col
+C         Rows and columns
+              integer         row, col, last_col
+C         Current element in weight array
+              real            curr_element
+C         Flag indicating that convolution has run off the aperture
+              logical         fold
+C         Full sample file name and lsf key.
+              character*(80)  full_sf_name
+              integer         lsf_key
+C         Current logical sample file number
+              integer         lsf_num
+C         Number of buffers in the current lsf.
+              integer         num_buff
+C         Number of visibilities in the current buffer
+              integer         num_vis
+C         Visibility buffer.
+              complex         vis( max_vis )
+C         UV coordinate buffer
+              real            uv( 2, max_vis )
+C         Weight to be given to a particular buffer
+              real*8          buff_wt
+C         Logical set for noise weighting, unset for super-smooth
+              logical         noise_weighting
+C         The effective skew angle of the map.
+              real*8          skew_angle
+C         The radius, in gridpoints, to smooth over.
+              integer         smooth_radius
+C         String and length
+              character*47    string
+              integer         ls
+C         Execution mode information
+              character*16    current_user
+              integer         exe_mode, termno
+
+C     ****************************************************************
+C
+C     Subroutine initialisation
+C
+      if ( s .ne. 0 ) return
+
+      if ( mod(wghttp,10) .eq. super_smooth ) then
+          noise_weighting = .false.
+          buff_wt         = 1.0D+0
+      else if ( mod(wghttp,10) .eq. noise_wt ) then
+          noise_weighting = .true.
+      else
+C         Not super smooth or noise weighting - array left undefined
+          return
+      end if
+
+C     Find execution mode
+      call enqexe( current_user, exe_mode, termno )
+
+C     Find smooth radius in pixels.
+      smooth_radius = nint( weight_params( 1 ) )
+
+C     Initialise arrays
+      do 40, i = 1, n2
+          do 30, j = 1, n1
+              work( j,i )       = 0.0D+0
+              smooth_arr( j,i ) = 0.0
+   30     continue
+   40 continue
+
+C     ****************************************************************
+C
+C         Main Code
+C         ---------
+C
+C     Read in the visibility points and sum to the nearest grid point
+      zero_col = n1
+      zero_row = n2/2+1
+
+      string(1:)    = 'Smoothing'
+
+      do 1000, i = 1, numlsf
+          call enmlsf( i, full_sf_name, lsf_key, s )
+          string(11:26) = full_sf_name
+          string(28:47) = '>-------------------'
+          if (exe_mode.eq.0) then
+            call wrout( string )
+          else
+            call wrout( string(1:27) )
+          end if
+          call lsf_open( full_sf_name, lsf_key, 'RC', lsf_num, s )
+          call lsf_enq_numbuff( lsf_num, num_buff, s )
+
+C         Find the effective UV plane skew angle for this LSF
+C         - this also sets the phase centre of the LSF
+          call get_skew_angle( lsf_num, skew_angle, s )
+          if ( s .ne. 0 ) goto 9999
+
+          do 500, j = 1, num_buff
+              if ( imod(j, max(1,int(num_buff/20))) .eq. 0 ) then
+                  ls = lend( string, '>' )
+                  string(ls+1:ls+2) = '->'
+                  if (exe_mode.eq.0) write(1,'(''+'',A)') string
+              end if
+
+              call lsf_set_buffer( lsf_num, j, s )
+              call lsf_get_vis(   lsf_num,
+     *                            max_vis,
+     *                            vis,
+     *                            num_vis,
+     *                            s          )
+              if (noise_weighting) then
+                  call buffer_wt( num_vis, vis, buff_wt )
+              end if
+
+              call lsf_get_uv(    lsf_num,
+     *                            max_vis,
+     *                            skew_angle,
+     *                            uv,
+     *                            num_vis,
+     *                            s          )
+              if ( s .ne. 0 ) goto 9999
+
+              do 400 k = 1, num_vis
+                  if ( vis( k ) .ne. ( 0.0, 0.0 ) ) then
+                      iu = nint( uv( 1, k ) * uwl2gp )
+                      iv = nint( uv( 2, k ) * vwl2gp )
+                      if ( iu .gt. 0 ) then
+                          col = zero_col-iu
+                          row = zero_row+iv
+                      else
+                          col = zero_col+iu
+                          row = zero_row-iv
+                      end if
+                      work( col,row ) = work( col, row ) + buff_wt
+                  end if
+  400         continue
+  500     continue
+
+          call lsf_close( lsf_num, s )
+          if ( s .ne. 0 ) goto 9999
+ 1000 continue
+
+C     Now convolve with a boxcar...
+      do 160 i = 1+smooth_radius, n2-smooth_radius
+          do 150 j = 1+smooth_radius, n1
+              curr_element = work(j,i)
+
+              if (curr_element .ne. 0) then
+                  last_col = j+smooth_radius
+                  fold     = (last_col .ge. n1)
+                  if (fold) last_col = n1
+
+                  do 110 row = i-smooth_radius, i+smooth_radius
+                      do 120, col = j-smooth_radius, last_col
+                          smooth_arr(col,row) =
+     *                                smooth_arr(col,row)+curr_element
+  120                 continue
+  110             continue
+
+                  if (fold) then
+                      do 140 row = (n2+2-i)-smooth_radius,
+     *                             (n2+2-i)+smooth_radius
+                          do 130, col = (n1+n1)-(j+smooth_radius), n1
+                              smooth_arr(col,row) =
+     *                                smooth_arr(col,row)+curr_element
+  130                     continue
+  140                 continue
+                  end if
+              end if
+  150     continue
+  160 continue
+
+C     Now convert all the weights to reals and invert them.
+      do 180, i = 1, n2
+          do 170, j = 1, n1
+              if ( smooth_arr( j, i ) .ne. 0 ) then
+                  smooth_arr( j, i ) = 1.0 / smooth_arr( j, i )
+              end if
+  170     continue
+  180 continue
+
+      return
+
+C     ****************************************************************
+C
+C         Error Handling
+C         --------------
+C
+ 9999 continue
+          call map_wrerr( s, 'in subroutine GET_SMOOTH_ARRAY' )
+          return
+      end
+C     Enforce explicit type checking
+
+      $implicit off
+
+C     *****************************************************************
+C
+C+get_skew_angle
+C
+      SUBROUTINE get_skew_angle(  lsf_num,
+     *                            skew_angle,
+     *                            s                      )
+
+C
+C     Calculates the skew angle for lsf_get_uv using the map redtape.
+C
+C     Given:
+C         Logical sample file number
+              integer             lsf_num
+
+C     Returned:
+C         Skew angle to be used for lsf_get_uv
+              real*8              skew_angle
+C         Status variable - must be zero on entry - otherwise error
+              integer             s
+C
+C     Utility routine for map-making that calculates the skew angle
+C     for lsf_get_uv so that the map is apparently projected in the
+C     correct coordinate system.
+C
+C     Uses the current map redtape and also updates the phase centre
+C     of the lsf to the correct phase centre for this map.
+C
+C     NPR.    21 September 1987.
+C
+C-
+C     ****************************************************************
+C
+C     Global includes -
+C         ( i.e. Global constant, variable and common declarations )
+C
+      $list off
+      $include        (library)constants:incl
+      $include        (library)maplib-errors:incl
+      $include        (library)maplib-redtape:incl
+      $list on
+
+C     ****************************************************************
+C
+C     Local constant and variable declarations
+C         Ra and dec, and U and V coordinates corresponding to them.
+              real*8          ra, dec, u, v
+C         An offset to apply to v corresponding to half a degree
+              real*8          offset
+C         Logical sample file parameters returned from enquiry routines.
+              real*8          lsf_epoch, lsf_ra, lsf_dec
+              character*16    src_name
+C         Map projection parameters returned from enquiry routines.
+              real*8          ref_ra, ref_dec, ref_date, obs_date
+              real*8          pr_usamp, pr_skew, pr_epoch, pr_angle
+              integer         pr_code
+              character*16    source_name
+
+C     ****************************************************************
+C
+C     Subroutine initialisation
+C
+C     Check for non zero entry status
+      if ( s .ne. 0 ) return
+
+C     Check map size is powers of two
+      if ( (nint(2.0**real(nint(alog2(real(ixmax))))) .ne. (ixmax)) .or.
+     *     (nint(2.0**real(nint(alog2(real(iymax))))) .ne. (iymax))    )
+     *                                                      then
+          s = ILL_REDTAPE
+          goto 9999
+      end if
+
+C     ****************************************************************
+C
+C         Main Code
+C         ---------
+C
+C     Enquire the map centre and projection.
+      call enmapc( ref_ra, ref_dec, ref_date, obs_date, source_name, s )
+      call enmapj( pr_code, pr_usamp, pr_skew, pr_epoch, pr_angle, s )
+
+C     Set the projection parameters to equatorial coordinates.
+      call stproj( 1, 1, pr_usamp, pr_skew,
+     *             ref_ra, ref_dec, ref_date, pr_epoch, s )
+
+C     Find the map centre and set the lsf phase centre to this point.
+      u = dble( iumap1 + ixmax/2 )
+      v = dble( ivmap1 - iymax/2 )
+      call uvtord( u, v, ra, dec, s )
+      call lsf_set_pc( lsf_num, pr_epoch, ra, dec, source_name, s )
+
+C     Find out where it's ended up at the observation date.
+      call lsf_enq_pc_epoch(  lsf_num,
+     *                        lsf_epoch, lsf_ra, lsf_dec, src_name, s )
+      if ( s .ne. 0 ) goto 9999
+
+C     Find the ra and dec of the point half a degree away up the v axis
+C     from (u,v) and precess it to epoch
+      offset = 1800.0D+0*const_sa2r/dble(pr_usamp)
+      call uvtord( u, (v+offset), ra, dec, s )
+      if ( s .ne. 0 ) goto 9999
+      call precrd2( 1, pr_epoch, ra, dec, lsf_epoch, ra, dec )
+
+C     Set projection parameters to observation date defaults.
+C     The correct map centre - (u,v), should be at (0,0) and we just
+C     have to find where the point (u,v+(0.5 degrees)) has got to.
+      call stproj( 1, 0, pr_usamp, 0.0D+0,
+     *             lsf_ra, lsf_dec, lsf_epoch, lsf_epoch, s )
+      call rdtouv( ra, dec, u, v, s )
+      if ( s .ne. 0 ) goto 9999
+
+      skew_angle = datan2( u, v )
+
+C     Reset the projection parameters to map defaults.
+      call stproj( pr_code, 1, pr_usamp, pr_skew,
+     *             ref_ra, ref_dec, ref_date, pr_epoch, s )
+      return
+
+C     ****************************************************************
+C
+C         Error Handling
+C         --------------
+C
+ 9999 continue
+          call map_wrerr( s, 'in subroutine GET_SKEW_ANGLE' )
+          return
+      end
+C     Enforce explicit type checking
+
+      $implicit off
+
+C     *****************************************************************
+C
+C+get_weight_buff
+C
+      SUBROUTINE get_weight_buff( num_uv,
+     *                            vis, uv,
+     *                            weight_type, weight_param,
+     *                            smooth_arr,
+     *                            n1, n2,
+     *                            weight,
+     *                            s                  )
+
+C
+C     Calculates the weights to be given to a buffer of uv positions.
+C
+C     Given:
+C         The number of uv points.
+              integer             num_uv
+C         The visibility buffer
+              complex             vis( num_uv )
+C         The uv coordinate buffer.
+              real                uv( 2, num_uv )
+C         weighting type and smooth type.
+              integer             weight_type
+C         weighting function parameters
+              real                weight_param(*)
+C         Dimensions of the half plane aperture.
+              integer             n1, n2
+C         The super smooth weighting array - (0,0) is at (n1,n2/2+1)
+              real                smooth_arr( n1,n2 )
+C
+C     Returned:
+C         The array of weights returned.
+              real                weight( num_uv )
+C         Status value - must be zero on entry.
+              integer             s
+C
+C     Generates a weighting array given a buffer of uv points and the
+C     smoothing array and weighting type and parameters. The uv array
+C     must be expressed in units of aperture gridpoints and the
+C     weighting is calculated using the following weighting types
+C     defined in the file (postmortem)weighting-types:incl :
+C
+C     0     - No weighting.
+C     1     - Super-smooth weighting :    Weight is from weight array.
+C     2     - Radial weighting :          w = r
+C     3     - Gaussian weighting :        w = e**( -r**2/sigma**2 )
+C             weight_param(1) = sigma
+C     4     - Radial*Gaussian weighting   w = r * e**( -r**2/sigma**2 )
+C             weight_param(1) = sigma
+C     10-15 - Same as above except a cutoff is applied at a radius of
+C             weight_param(2).
+C
+C     Note that sigma and the cutoff refer to the aperture plane, not
+C     the equatorial plane (they are different for sky coordinates).
+C     They are both expressed as a fraction of the aperture plane
+C     halfwidth measured along the axis.
+C
+C     NPR     8 December 1987.
+C
+C-
+C     ****************************************************************
+C
+C     Global includes -
+C         ( i.e. Global constant, variable and common declarations )
+C
+      $list off
+      $include        (library)maplib-errors:incl
+      $include        (postmortem)weighting-types:incl
+      $list on
+
+C     ****************************************************************
+C
+C     Variables, equivilances and commons
+C         Loop counter
+              integer         i
+C         Twice the variance of the gaussian weighting.
+              real            var_by2
+C         Square of the radius of the current gridpoint.
+              real            radius_sqr
+C         Weighting type disregarding any cutoff weighting.
+              integer         prim_wt_type
+C         Weight to be given to the current sample - as R*8 and R*4
+              real*8          r8buff_wt
+              real            buff_wt
+C         Maximum radius before cutoff squared.
+              real            max_r_sqr
+C         The nearest integral u, v coordinate
+              integer         u, v
+C         The row and column of the (0,0) point in the aperture
+              integer         zero_row, zero_col
+
+C     ****************************************************************
+C
+C     Subroutine initialisation
+C
+      if ( s .ne. 0 ) return
+
+C     ****************************************************************
+C
+C         Main Code
+C         ---------
+C
+      if (weight_type .lt. 10) then
+          prim_wt_type = weight_type
+      else
+          prim_wt_type = mod(weight_type,10)
+      end if
+
+      if ( prim_wt_type .eq. no_weighting ) then
+          do 100, i = 1, num_uv
+              weight(i) = 1.0
+  100     continue
+      else if ( prim_wt_type .eq. super_smooth ) then
+          zero_col = n1
+          zero_row = n2/2+1
+          do 200 i = 1, num_uv
+              u = nint(uv( 1, i ))
+              v = nint(uv( 2, i ))
+              if ( u .gt. 0 ) then
+                  weight(i) = smooth_arr(zero_col-u,zero_row+v)
+              else
+                  weight(i) = smooth_arr(zero_col+u,zero_row-v)
+              end if
+              weight(i) = weight(i)
+  200     continue
+      else if ( prim_wt_type .eq. radial_wt ) then
+          do 300, i = 1, num_uv
+              weight(i) = sqrt(uv(1,i)*uv(1,i) + uv(2,i)*uv(2,i))
+  300     continue
+      else if (prim_wt_type .eq. gaussian_wt ) then
+          var_by2=weight_param(1)*weight_param(1)*real(2*(n1-1)*(n1-1))
+          do 400, i = 1, num_uv
+              radius_sqr= uv(1,i)*uv(1,i)+uv(2,i)*uv(2,i)
+              weight(i) = exp(-radius_sqr/var_by2)
+  400     continue
+      else if (prim_wt_type .eq. radial_gauss_wt ) then
+          var_by2=weight_param(1)*weight_param(1)*real(2*(n1-1)*(n1-1))
+          do 500, i = 1, num_uv
+              radius_sqr= uv(1,i)*uv(1,i)+uv(2,i)*uv(2,i)
+              weight(i) = sqrt(radius_sqr)*exp(-radius_sqr/var_by2)
+  500     continue
+      else if ( prim_wt_type .eq. noise_wt ) then
+          call buffer_wt( num_uv, vis, r8buff_wt )
+          buff_wt  = r8buff_wt
+          zero_col = n1
+          zero_row = n2/2+1
+          do 600 i = 1, num_uv
+              u = nint(uv( 1, i ))
+              v = nint(uv( 2, i ))
+              if ( u .gt. 0 ) then
+                  weight(i) = smooth_arr(zero_col-u,zero_row+v)
+              else
+                  weight(i) = smooth_arr(zero_col+u,zero_row-v)
+              end if
+              weight(i) = weight(i)*buff_wt
+  600     continue
+      else
+          S = ILL_WEIGHT
+          goto 9999
+      end if
+
+      if (((weight_type - prim_wt_type).eq.10) .or.
+     *    ((weight_type - prim_wt_type).eq.30)) then
+C         Apply cutoff
+          max_r_sqr=weight_param(2)*weight_param(2)*real((n1-1)*(n1-1))
+          do 700, i = 1, num_uv
+              if ((uv(1,i)*uv(1,i)+uv(2,i)*uv(2,i)).gt.max_r_sqr) then
+                  weight(i) = 0.0
+              end if
+  700     continue
+      end if
+
+      return
+
+C     ****************************************************************
+C
+C         Error Handling
+C         --------------
+C
+ 9999 continue
+          call map_wrerr( s, 'in subroutine GET_WEIGHT_BUFF' )
+          return
+      end
+C     Now enforce explicit type checking.
+
+      $implicit off
+
+C     *****************************************************************
+C
+C+grid_vis_buff
+C
+      SUBROUTINE grid_vis_buff(   vis_buffer,
+     *                            uv_buffer,
+     *                            num_vis,
+     *                            aper,
+     *                            n1, n2,
+     *                            conv_hw, conv_os,
+     *                            conv, num_pts,
+     *                            weight_buffer,
+     *                            beam,
+     *                            s                  )
+
+C     Grids a buffer of complex visibilities onto an aperture.
+C
+C     Given:
+C         The number of visibilities to be gridded
+              integer         num_vis
+C         The buffer of complex visibities.
+              complex         vis_buffer( num_vis )
+C         uv coordinates of each visibility.
+              real            uv_buffer( 2, num_vis )
+C         The dimensions of the aperture.
+              integer         n1, n2
+C         The two dimensional aperture dimensions are aper(n1,n2) but
+C         it is declared in 1D for speed - (0,0) is at (n1, n2/2+1)
+              complex         aper( * )
+C         The half width to convolve in the u and v coordinates
+              integer         conv_hw
+C         The oversampling of the convolution function.
+              integer         conv_os
+C         The half-width of the convolution array
+              integer         num_pts
+C         The tabulated convolution function - declared symmetrically:
+              real            conv( -num_pts:num_pts )
+C         The weights to be applied to the visibilities
+              real            weight_buffer( num_vis )
+C         The aperture of the beam.
+              real            beam( * )
+
+C     Returned:
+C         Status variable - returned unchanged since no checking is
+C         done because of time constraints.
+              integer         s
+C
+C     Subroutine to grid a buffer of visibilities at the given uv
+C     positions into the aperture array 'aper' using the convolution
+C     function tabulated in conv.
+C
+C                                     Nick Rees - October 1986
+C
+C-
+C     ****************************************************************
+C
+C     Local variable declarations
+C         Loop counter and temporary storage variable
+              integer         i
+C         The current visibility being gridded
+              complex         vis
+              real            vis_real, vis_imag, vis_arr(2)
+              equivalence   ( vis_arr(1), vis )
+              equivalence   ( vis_arr(1), vis_real )
+              equivalence   ( vis_arr(2), vis_imag )
+C         The visibilities u, v and weight
+              real            u, v, weight
+C         The number of columns in the aperture
+              integer         aper_cols
+C         The u and v coordinates of the first element in the aperture
+              real            u_first, v_first
+C         Number of columns to grid minus 1
+              integer         conv_width_m_1
+C         The uv coordinates expressed in row-column coordinates.
+              real            u_col, v_row
+C         Increments to be added to the u and v coordinates to give
+C         the boundaries of the gridding box.
+              real            first_row_inc, first_col_inc
+C         Parameters defining the gridding box.
+              integer         first_row, last_row, row_inc,
+     *                        first_col, last_col, end_col
+C         The indexes in the 1D aperture array of the first element
+C         on the first row to be gridded and similarly the first
+C         element on the current row and the last row resp.
+              integer         first_row_offset, row_offset,
+     *                        last_row_offset
+C         The index in the 1D aperture array where the the visibility
+C         is currently being gridded to.
+              integer         full_offset
+C         The indexes in the convolution function table for the value
+C         to use for the first column, the current column and the
+C         current row.
+              integer         first_c_u, conv_u, first_c_v, conv_v
+C         The half width of the convolution table sampling in u and v
+C         coordinates.
+              real            delta
+C         The "weight" to be attatched to this visibility on this row
+C         and at this gridpoint.
+              real            row_wt, vis_wt
+C         A logical indicating the first pass for a given visibility.
+              logical         first_time
+
+C     ****************************************************************
+C
+C     Subroutine initialisation
+C
+      if (s .ne. 0) return
+
+      u_first   = 1-n1
+      v_first   = n2/2
+      aper_cols = n1
+
+      delta = 1/(2.0*real(conv_os))
+      first_row_inc =  0.5 + v_first - float(conv_hw) - delta
+      first_col_inc =  0.5 - u_first - float(conv_hw) - delta
+
+C     ****************************************************************
+C
+C         Main Code
+C         ---------
+C
+      do for i = num_vis, 1, -1
+          if ((vis_buffer(i)    .ne. (0.0,0.0)) .and.
+     *        (weight_buffer(i) .ne.  0.0     )         ) then
+              vis   = vis_buffer( i )
+              u     = uv_buffer( 1, i )
+              v     = uv_buffer( 2, i )
+              if (u .gt. 0.0) then
+                  u   = -u
+                  v   = -v
+                  vis = conjg( vis )
+              end if
+              weight= weight_buffer( i )
+              first_time = .false.
+
+  100         continue
+                  first_time = .not. first_time
+                  if (first_time) then
+                      v_row     = - (v - v_first)
+                      first_row = nint( first_row_inc - v )
+                      first_c_v = nint((real(first_row)-v_row)*conv_os)
+                      last_row  = first_row+conv_hw-first_c_v/conv_os
+                      row_inc   = aper_cols
+
+                      u_col     = + (u - u_first)
+                      first_col = nint( first_col_inc + u )
+                      first_c_u = nint((real(first_col)-u_col)*conv_os)
+                      last_col  = first_col+conv_hw-first_c_u/conv_os
+                      end_col   = min( last_col, aper_cols-1 )
+                  else
+                      vis       = conjg( vis )
+
+                      first_row = n2-first_row
+                      last_row  = n2-last_row
+                      row_inc   =-aper_cols
+                      first_c_u = (first_col-last_col)*conv_os-first_c_u
+                      first_col = aper_cols+aper_cols-last_col-2
+                  end if
+
+                  conv_width_m_1  = end_col - first_col
+                  first_row_offset= first_row*aper_cols + first_col + 1
+                  last_row_offset = last_row *aper_cols + first_col + 1
+
+                  conv_v = first_c_v
+                  do for row_offset = first_row_offset, last_row_offset,
+     *                                                         row_inc
+                      conv_u = first_c_u
+                      row_wt = conv( conv_v ) * weight
+
+                      do for full_offset = row_offset,
+     *                                     row_offset + conv_width_m_1
+                          vis_wt   = row_wt * conv( conv_u )
+                          beam(full_offset) = beam(full_offset) + vis_wt
+                          aper(full_offset) = aper(full_offset)
+     *                       + cmplx( vis_real*vis_wt, vis_imag*vis_wt )
+                          conv_u   = conv_u + conv_os
+                      end do
+                      conv_v = conv_v + conv_os
+                  end do
+              if (first_time .and. end_col.eq.(aper_cols-1)) goto 100
+          end if
+      end do
+
+C     Now ensure that central pixels of final column are hermitian
+      row_inc = 0
+      do for i = (n2/2+1)*aper_cols,(n2/2+conv_hw+1)*aper_cols,aper_cols
+          aper(i)         = (aper(i)+conjg(aper(i-row_inc)))/(2.0,0.0)
+          beam(i)         = (beam(i)+beam(i-row_inc))/2.0
+          aper(i-row_inc) = conjg(aper(i))
+          beam(i-row_inc) = beam(i)
+          row_inc         = row_inc+2*aper_cols
+      end do
+
+      if (s.eq.0) return
+
+C     ****************************************************************
+C
+C         Error Handling
+C         --------------
+C
+ 9999 continue
+          call map_wrerr( s, 'in subroutine GRID_VIS_BUFF' )
+          return
+      end
+
+C+grade_aperture
+C
+      SUBROUTINE grade_aperture(  aperture,
+     *                            n1, n2,
+     *                            u_wl2gp, v_wl2gp,
+     *                            grad_type, grad_param,
+     *                            beam, grad_flag,
+     *                            s                        )
+
+C
+C     Applies the grading function and also scales the aperture.
+C
+C     Given:
+C         Aperture bounds - n1 is the number of columns, n2 is rows.
+              integer         n1, n2
+C         Aperture array - element (n1, n2/2+1) is point (0,0)
+              complex         aperture( n1,n2 )
+C         Conversion factor from wavelengths to gridpoints in u and v.
+              real            u_wl2gp, v_wl2gp
+C         Grading function type.
+              integer         grad_type
+C         Grading function parameters.
+              real            grad_param(*)
+C         The aperture of the beam.
+              real            beam( n1,n2 )
+C         Function type flag (for valid values, see below)
+              integer         grad_flag
+
+C     Returned:
+C         Status variable - must be zero on entry - otherwise error
+              integer         s
+C
+C     This routine applies or removes grading on the basis of the value
+C     of the parameter grad_flag. If:
+C
+C         grad_flag = 1 - grading applied to both aperture and beam.
+C         grad_flag = 2 - grading removed from aperture only.
+C         grad_flag = 3 - grading removed from both aperture and beam.
+C         otherwise     - grading applied to aperture only.
+C
+C     For grading flags 1 and 3, both the beam and aperture are
+C     renormalised so that the height of the beam in the map plane is
+C     unity. For other grading flags the beam is not used and so can
+C     be input as a dummy variable.
+C
+C-
+C     ****************************************************************
+C
+C     Global includes -
+C         ( i.e. Global constant, variable and common declarations )
+C
+      $list off
+      $include        (library)constants:incl
+      $include        (library)maplib-redtape:incl
+      $include        (library)maplib-errors:incl
+      $include        (library)maplib-tabfns:incl
+      $include        (postmortem)grading-types:incl
+      $list on
+
+C     ****************************************************************
+C
+C     Local parameter declaration.
+C
+C         Maximum number of points in function tabulation
+              integer         max_pts
+              parameter     ( max_pts = 1200 )
+
+
+C     Local variable declarations
+C         Loop counters
+              integer         i, j
+C         Grading function tabulation and parameters
+              integer         fn_type, fn_hw, fn_os
+              real            fn_param(2), fn_tab( 0:max_pts )
+C         Grading to apply for a given element.
+              real            grad
+C         Twice the variance of the gaussian grading
+              real            var_by2
+C         Conversion factor from aperture wavelengths to table index
+              real            wl2tab
+C         Pointers to table
+              integer         tab_iptr
+              real            tab_ptr, frac
+C         The sum of the grading function points.
+              real*8          beam_sum
+C         The aperture normalisation factor.
+              real            aper_norm
+C         The radius squared of the gridpoint in the aperture plane.
+              real            radius_sqr
+C         Row and column in the aperture of the (0,0) point
+              integer         zero_row, zero_col
+C         U and V coordinates, in wavelengths of the projection of the
+C         current gridpoint onto the equatorial plane.
+              real            u, v
+C         Conversion factor from gridpoints to wavelengths.
+              real            u_gp2wl, v_gp2wl
+C         Round beam control switch
+              logical         round_beam
+
+C     ****************************************************************
+C
+C     Subroutine initialisation
+C
+C     Check for non zero entry status
+      if ( s .ne. 0 ) return
+
+C     Check if round beam
+      if ( grad_type.ge.100 ) then
+          round_beam = .true.
+          grad_type = grad_type - 100
+          v_wl2gp = real(iymax) * usamp * const_sa2r * dsin( decobs )
+      else
+          round_beam = .false.
+      endif
+
+C     Initialise and check the various grading types.
+      if (grad_type.eq.gaussian_gr.or.grad_type.eq.radial_gauss_gr) then
+          var_by2   = 2 * grad_param(1) * grad_param(1) *
+     *                real((n1-1)*(n1-1))/(u_wl2gp*u_wl2gp)
+      else if (grad_type.eq.psw2_gr .or. grad_type.eq.l2w2_gr .or.
+     *         grad_type.eq.psw3_gr .or. grad_type.eq.l2w3_gr .or.
+     *         grad_type.eq.optimal_gr                            ) then
+C         Tabulated grading function - set up the table
+          if (grad_type.eq.psw2_gr) then
+              fn_type = prol_spher
+              fn_hw   = 2
+          else if (grad_type.eq.psw3_gr) then
+              fn_type = prol_spher
+              fn_hw   = 3
+          else if (grad_type.eq.l2w2_gr) then
+              fn_type = l2_optimal
+              fn_hw   = 2
+          else if (grad_type.eq.l2w3_gr) then
+              fn_type = l2_optimal
+              fn_hw   = 3
+          else if (grad_type.eq.optimal_gr) then
+              fn_type = opt_grading
+              fn_hw   = int(1.0/grad_param(1))+1
+          end if
+
+          fn_os       = max_pts/fn_hw
+          fn_param(1) = grad_param(2)
+          wl2tab      = fn_os / abs(grad_param(1)*(n1-1)/u_wl2gp)
+          if (grad_type.ne.optimal_gr) wl2tab = wl2tab*fn_hw
+
+          call tabfn(-fn_type,fn_os,fn_hw,fn_param, max_pts,fn_tab, s )
+      else if (grad_type.ne.radial_gr.and.grad_type.ne.no_grading) then
+          s = ILL_GRADING
+      end if
+      if (s.ne.0) goto 9999
+
+C     ****************************************************************
+C
+C         Main Code
+C         ---------
+C
+      zero_col = n1
+      zero_row = n2/2+1
+      beam_sum = 0.0D+0
+      u_gp2wl  = 1.0/u_wl2gp
+      v_gp2wl  = 1.0/v_wl2gp
+
+      do 200, j = 1, n2
+          v = real(zero_row-j)*v_gp2wl
+          do 100, i = 1, n1
+              if (aperture(i,j) .ne. (0.0,0.0)) then
+                  u = real(zero_col-i)*u_gp2wl
+                  if (grad_type .eq. gaussian_gr ) then
+                      grad = exp(-(u*u+v*v)/var_by2)
+                  else if ( grad_type .eq. radial_gr ) then
+                      grad = sqrt(u*u+v*v)
+                  else if (grad_type .eq. radial_gauss_gr ) then
+                      radius_sqr= u*u+v*v
+                      grad = sqrt(radius_sqr)*exp(-radius_sqr/var_by2)
+                  else if (grad_type .eq. no_grading) then
+                      grad = 1.0
+                  else
+                      tab_ptr = wl2tab*sqrt(u*u+v*v)
+                      tab_iptr= int(tab_ptr)
+                      if (tab_iptr.ge.(fn_hw*fn_os)) then
+C                         Off table
+                          grad = 0.0
+                      else
+                          frac = tab_ptr-tab_iptr
+                          grad = (1.0-frac)*fn_tab(tab_iptr) +
+     *                                frac *fn_tab(tab_iptr+1)
+                      end if
+                  end if
+
+                  if (grad_flag.eq.2.or.grad_flag.eq.3) then
+C                     Remove grading rather than apply it.
+                      if (grad.ne.0.0) grad = 1.0/grad
+                  end if
+
+                  if (grad_flag.eq.1.or.grad_flag.eq.3) then
+C                     Apply grading to aperture and beam
+                      aperture(i,j) = aperture(i,j) * cmplx(grad,0.0)
+                      beam(i,j)     = beam(i,j) * grad
+                      beam_sum      = beam_sum + 2*beam(i,j)
+                  else
+                      aperture(i,j) = aperture(i,j) * cmplx(grad,0.0)
+                  end if
+              else
+C                 Aperture is null - ensure beam is too.
+                  if (grad_flag.eq.1.or.grad_flag.eq.3) beam(i,j)=0.0
+              end if
+  100     continue
+
+C         Remove doubled up final column from beam sum.
+          if (grad_flag.eq.1.or.grad_flag.eq.3) then
+              beam_sum = beam_sum - beam(n1,j)
+          end if
+  200 continue
+
+C     Normalise aperture and beam, if neccesary.
+      if (grad_flag.eq.1.or.grad_flag.eq.3) then
+          aper_norm = real(2*(n1-1)*n2) / real(beam_sum)
+
+          do 400, j = 1, n2
+              do 300, i = 1, n1
+                  aperture(i,j) = aperture(i,j)*cmplx(aper_norm,0.0)
+                  beam(i,j)     = beam(i,j)*aper_norm
+  300         continue
+  400     continue
+      end if
+
+      return
+
+C     ****************************************************************
+C
+C         Error Handling
+C         --------------
+C
+ 9999 continue
+          call map_wrerr( s, 'in subroutine GRADE_APERTURE' )
+          return
+      end
+
+C     *****************************************************************
+C
+C+write_aperture
+C
+      subroutine write_aperture( file_name, data, comp, s )
+
+C     Writes out the cos, sin, amp or phase of an aperture as a map.
+C
+C     Given
+C         Map file name.
+              character*(*)   file_name
+C         Aperture data
+              complex         data(*)
+C         Component type - must match one of 'amplitude', 'phase',
+C                          'cosine' or  'sine'.
+              character*(*)   comp
+C
+C     Returned
+C         Status - must be zero on entry.
+              integer         s
+C
+C     Writes out a single component (sine, cosine, amplitude or phase)
+C     or both components (as a complex aperture in mapper format)
+C     of the current aperture data in the form of a map. This enables
+C     the aperture to be displayed using all the available map display
+C     routines.
+C
+C     NPR     7 November 1987, from a previous version from last year.
+C
+C-
+C     ****************************************************************
+C
+C     Function declarations -
+C
+      $include    (library)chrlib-functions:incl
+
+C     ****************************************************************
+C
+C     Global includes -
+C         ( i.e. Global constant, variable and common declarations )
+C
+C
+      $list off
+      $include        (library)maplib-redtape:incl
+      $list on
+
+C     ****************************************************************
+C
+C     Local constant and variable declarations
+C
+C     Constants
+C         File i/o system parameters
+              integer     rec_siz
+              parameter  (rec_siz  = 4096)
+
+C     Variables, equivilances and commons
+C         Output record.
+              real        out_rec(rec_siz)
+C         Number of records in map, current record and current element.
+              integer     n_recs, rec_n, rec_index
+C         First and last row in record and number of rows in record.
+              integer     first_row, last_row, rows_in_rec
+C         The column and row of the current element in the map
+              integer     col_n, row_n
+C         The column and row of the current element in the aperture
+C         and its offset from the first element in the aperture.
+              integer     uv_col_n, uv_row_n, offset
+C         Length of file block=length of map row in words.
+              integer     block_siz
+C         First block where map data starts, and current block number.
+              integer     init_block_n, block_n
+C         Flag set if we are on the congagated side of the aperture.
+              logical     cong_flg
+              real        sgn
+C         Flags set if outputting cos, sin, amp or phase of the aperture
+              logical     cosap, sinap, ampap, phiap
+C         File names
+              character   map_name*16, user*33, type*4, aper_name*80
+C         String length and unit number of the aperture
+              integer     ls, lun
+
+C     ****************************************************************
+C
+C     Subroutine initialisation
+C
+C     Check for non zero entry status
+      if ( s .ne. 0 ) return
+
+      cosap = cmatch( comp, 'cosine' )
+      sinap = cmatch( comp, 'sine' )
+      ampap = cmatch( comp, 'amplitude' )
+      phiap = cmatch( comp, 'phase' )
+      call brkfil( file_name, user, map_name, type )
+      if (cosap) then
+          call makfil( user, map_name, 'cos', aper_name, ls )
+      else if (sinap) then
+          call makfil( user, map_name, 'sin', aper_name, ls )
+      else if (ampap) then
+          call makfil( user, map_name, 'amp', aper_name, ls )
+      else
+          call makfil( user, map_name, 'phi', aper_name, ls )
+      end if
+      call opemap( lun, aper_name, 'write', 1, s )
+
+
+      n_recs       = (iymax*ixmax-1)/rec_siz + 1
+      rows_in_rec  = min(iymax, int(rec_siz/ixmax))
+      init_block_n = mpblk1
+      block_siz    = mpblk/4
+      block_n      = init_block_n
+      zmax         = 0.0
+      zmin         = 0.0
+      call setbs( lun, block_siz )
+
+C     ****************************************************************
+C
+C         Main Code
+C         ---------
+C
+C
+      last_row = 0
+
+      do 1000 rec_n = 1, n_recs
+          rec_index = 0
+          first_row = last_row+1
+          last_row  = min(first_row+rows_in_rec-1, iymax)
+
+C         For all rows in that record...
+          do 800 row_n = first_row, last_row
+C             For each column...
+              do 500 col_n=1,ixmax
+                  cong_flg=col_n.gt.(ixmax/2+1)
+                  if (cong_flg) then
+                      uv_col_n=ixmax-col_n+2
+                      uv_row_n=iymax-row_n+2
+                      sgn = -1
+                  else
+                      uv_col_n=col_n
+                      uv_row_n=row_n
+                      sgn = 1
+                  end if
+
+                  offset   = (ixmax/2+1)*(uv_row_n-1)+uv_col_n
+                  rec_index= rec_index+1
+C
+                  if ( uv_row_n.gt.iymax .or.
+     *                data(offset).eq.(0.0,0.0)) then
+                      out_rec(rec_index)=0.0
+                  else
+                      if (ampap) then
+                          out_rec(rec_index)=cabs(data(offset))
+                      else if (cosap) then
+                          out_rec(rec_index)=real(data(offset))
+                      else if (sinap) then
+                          out_rec(rec_index)=sgn*aimag(data(offset))
+                      else if (phiap) then
+                          out_rec(rec_index)=sgn*
+     *                      atan2(imag(data(offset)),real(data(offset)))
+                      end if
+                  end if
+
+                  if (out_rec(rec_index).gt.zmax) then
+                      zmax   = out_rec(rec_index)
+                      ivzmax = iymax/2-row_n+1
+                      iuzmax = col_n-ixmax/2-1
+                  end if
+                  if (out_rec(rec_index).lt.zmin) then
+                      zmin   = out_rec(rec_index)
+                      ivzmin = iymax/2-row_n+1
+                      iuzmin = col_n-ixmax/2-1
+                  end if
+  500         continue
+  800     continue
+C
+          call wfile(lun,0, out_rec, block_n, rec_index)
+          if (errcode.ne.0) then
+              s = errcode
+              goto 9999
+          else
+              block_n=block_n+rec_index/block_siz
+          end if
+ 1000 continue
+
+      call wrredt( lun, 1, 0, s )
+      if (s .ne. 0) goto 9999
+      close( lun )
+
+      return
+
+C     ****************************************************************
+C
+C         Error Handling
+C         --------------
+C
+
+ 9999 continue
+          call map_wrerr( s, 'in subroutine WRITE_APERTURE' )
+          return
+      end
+C     Enforce explicit type checking
+
+      $implicit off
+
+C     *****************************************************************
+C
+C+correct_map
+C
+      SUBROUTINE correct_map( map,
+     *                        n1, n2,
+     *                        conv_hw, conv_os, max_conv_pts, conv,
+     *                        corr_type,
+     *                        invert_flag,
+     *                        s                        )
+
+C
+C     Applies or removes the gridding correction function.
+C
+C     Given:
+C         Map bounds - n1 is the number of columns, n2 is rows.
+              integer         n1, n2
+C         Map array
+              real            map( n1,n2 )
+C         Convolution function array halfwidth (for dimensioning)
+              integer         max_conv_pts
+C         Actual conv fn. halfwidth and over sampling.
+              integer         conv_hw, conv_os
+C         Tabulated convolution function.
+              real            conv( -max_conv_pts:max_conv_pts )
+C         Correction function type.
+              integer         corr_type
+C         Invert flag - set true to divide by the gridding correction
+C                       function, instead of multipying by it.
+C                       (ie set when converting a map into an aperture.)
+              logical         invert_flag
+
+C     Returned:
+C         Status variable - must be zero on entry - otherwise error
+              integer             s
+C
+C     Multiplys the map by the gridding correction function for a given
+C     convolution function.  The inverse of this process can be done if
+C     the parameter invert_flag is set .true., instead of .false., which
+C     is normally the case.
+C
+C-
+C     ****************************************************************
+C
+C     Global includes -
+C         ( i.e. Global constant, variable and common declarations )
+C
+      $list off
+      $include        (library)maplib-errors:incl
+      $list on
+
+C     ****************************************************************
+C
+C     Local constant and variable declarations
+C
+C     Constants
+C         Maximum size of correction array
+              integer         max_corr_size
+              parameter     ( max_corr_size = 1024 )
+
+C     Variables, equivilances and commons
+C         Loop counters
+              integer         i, j
+C         Correction array
+              real            corr( max_corr_size )
+
+C     ****************************************************************
+C
+C     Subroutine initialisation
+C
+C     Check for non zero entry status
+      if ( s .ne. 0 ) return
+
+      if ((n1 .gt. max_corr_size) .or. (n2 .gt. max_corr_size)) then
+          s = ARR_TOOSMALL
+          goto 9999
+      end if
+
+C     ****************************************************************
+C
+C         Main Code
+C         ---------
+C
+      call corrfn( conv_hw, conv_os, max_conv_pts, conv,
+     *             corr_type, n1, corr, s                )
+      if ( s .ne. 0 ) goto 9999
+
+      if ( n1 .eq. n2 ) then
+          if (.not. invert_flag) then
+              do 200, i = 1, n1
+                  do 100, j = 1, n2
+                      map(j,i) = map(j,i)*corr(i)*corr(j)
+  100             continue
+  200         continue
+          else
+              do 400, i = 1, n1
+                  do 300, j = 1, n2
+                      map(j,i) = map(j,i)/(corr(i)*corr(j))
+  300             continue
+  400         continue
+          end if
+      else
+          do 600, j = 1, n2
+              do 500, i = 1, n1
+                  if (invert_flag) then
+                      map( i, j ) = map(i,j)/corr(i)
+                  else
+                      map( i, j ) = map(i,j)*corr(i)
+                  end if
+  500         continue
+  600     continue
+
+          call corrfn( conv_hw, conv_os, max_conv_pts, conv,
+     *                 corr_type, n2, corr, s               )
+          if ( s .ne. 0 ) goto 9999
+
+          do 800, j = 1, n2
+              if (invert_flag) then
+                  corr(j) = 1.0/corr(j)
+              else
+                  corr(j) = corr(j)
+              end if
+
+              do 700, i = 1, n1
+                  map( i, j ) = map( i, j )*corr( j )
+  700         continue
+  800     continue
+      end if
+
+      return
+
+C     ****************************************************************
+C
+C         Error Handling
+C         --------------
+C
+ 9999 continue
+          call map_wrerr( s, 'in subroutine CORRECT_MAP' )
+          return
+      end
+C     Now enforce explicit type checking
+
+      $implicit off
+
+C     *****************************************************************
+C
+C+buffer_wt
+
+      subroutine buffer_wt( n, a, buff_wt )
+
+C     Returns the weight for a given buffer in the mapping process.
+
+C     Given
+C         Number of buffer elements
+              integer     n
+C         Visibility buffer
+              complex     a(n)
+
+C     Returned
+C         Weight to be given to the buffer
+              real*8      buff_wt
+
+C     The buffer weight returned is basically the inverse of the mean
+C     of the variance of the cos and sin channels taken independently.
+C     Null (0,0) elements are ignored. If there is less than two valid
+C     elements in the array the buffer_wt is returned as zero.
+C
+C     NPR    18 May 1988
+C
+C-
+      real*8      rsum, isum, rsum_sqr, isum_sqr, variance
+      integer     i, non_null
+
+      rsum     = 0.0D+0
+      rsum_sqr = 0.0D+0
+      isum     = 0.0D+0
+      isum_sqr = 0.0D+0
+      non_null = 0
+
+      do 100, i = 1, n
+          if (a(i).ne.(0.0,0.0)) then
+              rsum     = rsum     + real(a(i))
+              rsum_sqr = rsum_sqr + real(a(i))*real(a(i))
+              isum     = isum     + imag(a(i))
+              isum_sqr = isum_sqr + imag(a(i))*imag(a(i))
+              non_null = non_null + 1
+          end if
+  100 continue
+
+      if (non_null .ge. 2) then
+          variance = ((rsum_sqr+isum_sqr) -
+     *                (rsum*rsum+isum*isum)/real(non_null)) /
+     *                                            (2*real(non_null))
+          if (variance .le. 0.0) then
+C             Suspicious - reject buffer
+              buff_wt = 0.0D+0
+          else
+              buff_wt = 1.0 / variance
+          end if
+      else
+          buff_wt = 0.0D+0
+      end if
+
+      return
+      end
+
+
+C+get_rg_weight
+
+      subroutine get_rg_weight(   num_vis,
+     &                             wghttp,
+     &                             lsf_num,
+     &                             max_vi,
+     &                             samp_aes,
+     &                             Tsys, buff_num,
+     &                             nominal_rg,
+     &                             weight,
+     &                             rg_weight,
+     &                             s          )
+
+C     Modifies the weight buffer for the current visibility according to
+C     the rain gauge readings, and updates the overall weight of the
+C     aperture.
+
+C     Given
+C         Number of visibilities in the buffer
+             integer     num_vis
+C         Weight type: values 20-30 indicate rg weighting required
+             integer     wghttp
+C         Lsf number being used
+             integer     lsf_num
+C         Max number of visibilities, needed for array declaration below
+              integer    max_vi
+C         Array of aerial pairs for each visibility in the buffer
+             integer     samp_aes( max_vi, 2 )
+C         Array of nominal system temperatures of each aerial
+             real        Tsys( 1 )
+C         Current buffer number
+             integer     buff_num
+C         rg value for which actual Tsys = nominal Tsys
+             real        nominal_rg
+C         Array of weights already set by get_weight_buff
+             real        weight( num_vis )
+C     Returns
+C         Array of weights for the current visibility buffer
+C             real        weight( num_vis )
+C         Accumulated sum of weights for normalising aperture
+             real        rg_weight
+C         Status - must be zero on entry
+             integer     s
+C-
+
+      $implicit off
+C     Global includes -
+      $include (postmortem)phys-tscopes:incl
+      $include (postmortem)global-constants:incl
+      $include (postmortem)mon-v2-block:incl
+
+      integer lun, lsf_source, itscope
+      integer first_samp, last_samp
+      integer i, j, first_sample, last_sample
+      real rain
+      real wt, rg(max_rt_aes)
+
+      if (s.ne.0) goto 999
+
+      call lsf_enq_sf(lsf_num, lun, lsf_source, s)
+      call enq_sftype(lun, i, s)
+      call enq_phys_tscope(lun, itscope, s)
+      if (itscope.ne.ryle) return
+
+C     Check if rg weighting required
+      if ((wghttp.lt.20).or.(wghttp.gt.29)) return
+
+C     Get range of physical samples in this buffer
+      call lsf_enq_samples(lsf_num, buff_num,
+     & first_sample, last_sample, s)
+
+C     Calculate average rg values during buffer
+      do 100, i = 1, max_rt_aes
+          rg(i) = 0.0
+          do 200, j = first_sample, last_sample
+              call read_monitor(lun, j, mon_length, mon_block, s)
+              if (s.ne.0.0) then
+                    call map_wrerr(s, 'in subroutine GET_RG_WEIGHT')
+              end if
+              call enq_mon_rain(lun, i, rain, s)
+              rg(i) = rg(i) + rain
+ 200      continue
+          rg(i) = rg(i) / (last_sample - first_sample + 1)
+ 100  continue
+
+C     Calculate and accumulate weights
+C     Weight is 1 / (calculated Tsys1 * Tsys2)
+
+      do 300, i = 1, num_vis
+          wt = rg(samp_aes(i,1)) * rg(samp_aes(i,2))
+     &    / (Tsys(samp_aes(i,1)) * Tsys(samp_aes(i,2))
+     &    * nominal_rg * nominal_rg)
+          weight(i) = weight(i) * wt
+          rg_weight = rg_weight + wt
+ 300  continue
+
+      return
+
+ 999  call map_wrerr(s, 'in subroutine GET_RG_WEIGHT')
+
+      end
+
+
+C+READ_MONITOR
+
+      subroutine read_monitor ( lun,
+     *                          samp_num,
+     *                          mon_length,
+     *                          mon_block,
+     *                          s           )
+C
+C     Returns the monitor block for a single sample.
+C
+C     Given:
+C         The logical unit number of the sample file.
+              integer             lun
+C         The number of the sample to be read.
+              integer             samp_num
+C         The length of the monitor block.
+              integer             mon_length
+C
+C     Returned:
+C         The monitor block.
+              integer*2           mon_block ( mon_length )
+C         Status variable - must be zero on entry otherwise error.
+              integer             s
+C
+C     A low level routine for reading the values of parameters monitored
+C     during the observation.  The detailed contents of the monitor block
+C     are described in the include file (POST)MON-BLOCK:INCL.  Readings of
+C     AGC values, PC settings, aerial pointing and correlator error counts
+C     are recorded with each sample, together with a count which is incremented
+C     during the run whenever the monitored information is updated.
+C
+C     DJT,    June 1987
+C-
+
+C     Global includes -
+C
+      $list off
+      $include  (postmortem)samp-rt:incl
+      $include  (postmortem)sf-pack:incl
+      $include  (postmortem)sf-buffer:incl
+      $include  (postmortem)samplib-errors:incl
+      $list on
+
+C     Local variable declarations -
+
+C         Loop counter
+              integer     i
+C         Pointers to positions in file buffer
+              integer     offset, rt_offset, mon_offset
+
+C     Subroutine initialisation
+C
+      if ( s .ne. 0 ) return
+
+C     Read the sample into the file buffer if necessary
+C
+C      if (length_mon .eq. 0) then
+C          s = NOT_PHYSF
+C          goto 999
+C      end if
+
+      call read_buffer ( lun, 1, samp_num, s )
+      if ( s .ne. 0 ) goto 999
+
+      offset = buffer_ptr + data_offset +
+     *         (curr_samp-first_samp)*samp_len - 1
+
+C     Read the sample redtape
+C
+      rt_offset = offset + start_rt - 1
+      do 10 i = 1, length_rt
+          samp_rt( i )= buffer( rt_offset+i )
+   10 continue
+
+C     Read the monitor block
+C
+      mon_offset = offset + start_mon - 1
+      mon_offset = 2*mon_offset
+
+      if ( data_type .eq. 1 ) then
+          do i = 1, mon_length
+              mon_block(i) = ibuff(mon_offset+i)
+          enddo
+      else
+          s = ILL_DATATYPE
+          goto 999
+      end if
+
+      return
+
+C     Error handling -
+C
+
+ 999  call smp_wrerr( s, 'in subroutine READ_MONITOR')
+
+      end
+
+

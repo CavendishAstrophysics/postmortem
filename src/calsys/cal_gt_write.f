@@ -1,7 +1,6 @@
-C
 C+ cal_gt_write
 
-       subroutine cal_gt_write( csf_name, s )
+       subroutine cal_gt_write(csf_name, s)
 C      --------------------------------------
 C
 C Write the current gains table to the permanent gain table file
@@ -19,7 +18,10 @@ C to supply their initials and comment information to be added to the
 C file.
 C
 C PA, 23/04/90
-C last mod GP 11 Apr 2000 (io_setacc)
+C GGP 11 Apr 2000 (io_setacc)
+C GGP 13 June 2001 - new gain-file format
+C GGP 21 June 2001 - corrected handling of index file
+C GGP 25 June 2001 - corrected check on no of entries
 C-
 
        include '/mrao/post/include/global_constants.inc'
@@ -35,7 +37,7 @@ C local variables
 C   sample file unit number
        integer      sf_lun
 C   unit number of gains tables
-       integer      iunit, iunit_vis
+       integer      u_index, u_gains, u_vis
 C   loop counters
        integer      i, ich, isb, iae
 C   record counter
@@ -50,7 +52,7 @@ C   length of string
 C   date and time array
        integer      datim(6)
 C   flag to indicate existence of GT file
-       logical      exists
+*       logical      exists
 C   string variable for reporting
        character    string*40
 C   user name, execution mode, terminal number for io_enqexe call
@@ -67,57 +69,39 @@ C check for currently active gains solution
        end if
 
 C open the gains table file and update control block
-       iunit = 0
-       inquire ( file=RT_gt_file, exist = exists )
-       if (.not.exists) then
-         call io_crefil( RT_gt_file, 0, .true., 1, s )
-         call io_setacc( RT_gt_file, 'r', 'rw', 'rw', s)
-         iprint = 0
-         nwd = 1024
-         bsize = 4*1024
-         gt_num_rec = 0
-         call io_operan( iunit, RT_gt_file, 'WRITE', bsize, iprint, s )
-         call io_wrfile( iunit, 1, gt_times, nwd, s )
-         call io_close ( iunit, s )
-         if (s.ne.0) goto 999
-       end if
-       iunit = 0
-       inquire ( file=RT_gtvis_file, exist = exists )
-       if (.not.exists) then
-         call io_crefil( RT_gtvis_file, 0, .true., 1, s )
-         call io_setacc( RT_gtvis_file, 'r', 'rw', 'rw', s)
-         iprint = 0
-         nwd = 2560
-         bsize = 4*2560
-         gt_iovis(1) = 0
-         call io_operan( iunit, RT_gtvis_file, 'WRITE', bsize,
-     *                                                  iprint, s )
-         call io_wrfile( iunit, 1, gt_iovis, nwd, s )
-         call io_close ( iunit, s)
-         if (s.ne.0) goto 999
-       end if
+
        iprint = 0
-       nwd = 1024
-       bsize = 4*1024
-       call io_operan( iunit, RT_gt_file, 'WRITE', bsize, iprint, s )
-       call io_rdfile( iunit, 1, gt_times, nwd, s )
+       nwd    = gt_max_entries
+       bsize  = 4*gt_blocksize
+       call io_operan(u_index, RT_gt_index, 'WRITE', bsize, iprint, s)
+       call io_rdfile(u_index, 1, gt_index, nwd, s)
        num_rec = gt_num_rec + 1
        gt_num_rec = num_rec
+
+        if (gt_num_rec .ge. gt_max_entries) then
+            call io_wrout('Gain table index is full:')
+            call io_wrout('parameter max_gt_entries must be changed')
+            call io_wrout('and the calib system recompiled')
+            goto 999
+        endif
+
+       call io_operan(u_gains, RT_gains, 'WRITE', bsize, iprint, s)
+
        if (s.ne.0) goto 999
 
 C open the sample file of the calibration
-       call open_sf( sf_lun, csf_name, 'READ', 0, s )
+       call open_sf(sf_lun, csf_name, 'READ', 0, s)
 C read the necessary information from the control tables to construct
 C the gain table record
-       call enq_gt_rec( sf_lun, gt_record, s )
+       call enq_gt_rec(sf_lun, gt_record, s)
 C close the physical sample file
-       call close_sf( sf_lun, s )
+       call close_sf(sf_lun, s)
 
 C copy solution to the output file
        do iae = 1,max_RT_aes
          do isb = 1,max_subb
            do ich = 1,max_channel
-             gt_ae_gains( ich, isb, iae ) = ae_gains( ich, isb, iae )
+             gt_ae_gains(ich, isb, iae) = ae_gains(ich, isb, iae)
            end do
          end do
        end do
@@ -127,13 +111,9 @@ C copy calibration record to the output file
          gt_cal_record(i) = cal_record(i)
        end do
 
-C get additional information from operator
-c      call io_getwrd('Please give your initials (6 characters max) : ',
-c    *             'ANON', gt_operator, ls, s )
-c      if (s.ne.0) goto 999
        call io_enqexe(user, mode, termno)
        gt_operator = user(1:6)
-       call io_wrout( 'Supply up to 8 lines of comment text' )
+       call io_wrout('Supply up to 8 lines of comment text')
        do ls=1,8
          gt_comment(ls) = ' '
        end do
@@ -148,15 +128,15 @@ C set flag to indicate the visibility-based solution should be saved
        gt_vis_soln = cal_type.eq.3
 
 C read current date and time for this record
-       call util_enqdat( gt_date )
-       call util_enqtim( gt_time )
+       call util_enqdat(gt_date)
+       call util_enqtim(gt_time)
 
 C write the new records
        do i=1,3
          datim(i) = gt_itim1(i)
          datim(i+3) = gt_idat1(i)
        end do
-       call util_datint( datim, gt_times(num_rec+1) )
+       call util_datint(datim, gt_index(num_rec+1))
 
 C test for visibility-based solution
        if (gt_vis_soln) then
@@ -164,21 +144,20 @@ C .. output a visibility-gains solution
          iprint = 0
          nwd = 2560
          bsize = 4*2560
-         call io_operan( iunit_vis, RT_gtvis_file, 'WRITE', bsize,
-     *                                                      iprint, s )
-         call io_rdfile( iunit_vis, 1, gt_iovis, nwd, s )
+         call io_operan(u_vis, RT_v_gains, 'WRITE', bsize, iprint, s)
+         call io_rdfile(u_vis, 1, gt_iovis, nwd, s)
          gt_vis_rec = gt_iovis(1)+1
          gt_iovis(1) = gt_vis_rec
-         call io_wrfile( iunit_vis, 1, gt_iovis, nwd, s )
+         call io_wrfile(u_vis, 1, gt_iovis, nwd, s)
          do i=1,max_vis
            gt_vis_gains(i) = vis_gains(i)
          end do
-         call io_wrfile( iunit_vis, gt_vis_rec+1, gt_iovis, nwd, s )
-         call io_close ( iunit_vis, s )
+         call io_wrfile(u_vis, gt_vis_rec+1, gt_iovis, nwd, s)
+         call io_close (u_vis, s)
        endif
 
-       call io_wrfile( iunit, 1, gt_times, 1024, s )
-       call io_wrfile( iunit, num_rec+1, gt_io, 1024, s )
+       call io_wrfile(u_index, 1, gt_index, gt_max_entries, s)
+       call io_wrfile(u_gains, num_rec, gt_io, gt_blocksize, s)
 
 C report writing of record and set cmd-language parameter
        if (gtopt_report_write) then
@@ -188,12 +167,13 @@ C report writing of record and set cmd-language parameter
        end if
        string = ' '
        write(string,'(I8)') num_rec
-       call cmd_setparam( '%GT-RECORD', string(1:chr_lenb(string)), s )
+       call cmd_setparam('%GT-RECORD', string(1:chr_lenb(string)), s)
 
-C take action on error
-999    if (s.ne.0) call cal_wrerr( s, 'in subroutine cal_gt_write' )
 
-C close file
-       call io_close ( iunit, s )
+999    if (s.ne.0) call cal_wrerr(s, 'in subroutine cal_gt_write')
+
+
+       call io_close (u_index, s)
+       call io_close (u_gains, s)
 
        end

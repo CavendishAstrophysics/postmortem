@@ -13,9 +13,7 @@ C
 C Initialise the current gains table if it is not already initialised.
 C The gains table is initialised to (1.0,0.0).
 C
-C PA 25/04/90
-C PA 05/02/92; added support for multiple GT files to be defined and
-C              definition of the file names from C.L. parameters.
+C PA 25/04/90 
 C-
        include '/mrao/include/chrlib_functions.inc'
        include '/mrao/post/include/post_sys_pars.inc'
@@ -31,25 +29,8 @@ C    counters
 
        if (s.ne.0) return
 
-C check the gains-table file names and if not set use:
-C  (a) file names defines in the command language
-C  (b) default file names
-       if (chr_lenb(RT_gt_file).eq.0) then
-c        call cmd_enqparam('RT-GT-file',RT_gt_file,s)
-         if (s.ne.0) s = 0
-         if (chr_lenb(RT_gt_file).eq.0) then
-           RT_gt_file = def_RT_gt_file
-         end if
-       end if
-       if (chr_lenb(RT_gtvis_file).eq.0) then
-c        call cmd_enqparam('RT-GTvis-file',RT_gtvis_file,s)
-         if (s.ne.0) s = 0
-         if (chr_lenb(RT_gtvis_file).eq.0) then
-           RT_gtvis_file = def_RT_gtvis_file
-         end if
-       end if
-
 C initialise the current gains table
+
        if ((.not.current_gains_table) .and.
      *     (.not.current_solution)         ) then
          do i=1,max_vis

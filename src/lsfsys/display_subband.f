@@ -225,7 +225,7 @@ c    *            ' Channel ', ich,radii(spac_num),'/\\'
 
 
 C ... plot data or model
-          call plot_complex(  title,
+          call plot_complexN(  title,
      *                        extra_title,
      *                        'ST (hrs)',
      *                        vis_list(ispac,1),
@@ -233,7 +233,7 @@ C ... plot data or model
      *                        time,
      *                        plot_device,
      *                        plot_type,
-     *                        s                      )
+     *                        lsf_num, s)
         end do
 
 C .. increment spacing pointer

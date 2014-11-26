@@ -1,7 +1,8 @@
 C
 C+mapper
 C
-      subroutine mapper (map_name, s)
+      subroutine mapper ( map_name,
+     *                    s                      )
 
 C
 C     Makes a map using the redtape in the specified file.
@@ -19,8 +20,6 @@ C     and makes a map from the definition in the map red tape.
 C
 C     NPR     throughout 1987.
 C     PJW modified to include beamsets with integration-time smearing 8/91
-C     GP  9 May 2000: added MEJ code (1992!) for rain-gauge weighting
-C     GP  6 Feb 2003: hid some messages 
 C-
 C     ****************************************************************
 C
@@ -30,7 +29,8 @@ C
 C
 C     ****************************************************************
 C
-C     Global includes - (constant, variable and common declarations)
+C     Global includes -
+C         ( i.e. Global constant, variable and common declarations )
 C
       include '/mrao/include/constants.inc'
       include '/mrao/include/maplib_redtape.inc'
@@ -57,7 +57,7 @@ C         Convolution function half width.
               integer         max_conv_hw
               parameter     ( max_conv_hw = 400 )
 
-C     Variables, equivalences and commons
+C     Variables, equivilances and commons
 C         Loop counters
               integer         i, j, k
 C         Real, complex and integer declarations of the workspace.
@@ -90,17 +90,6 @@ C         UV coordinate buffer for visibilities
               real            uv( 2, max_vis )
 C         Weights for each visibility.
               real            weight( max_vis )
-C         Table of aerial pairs for each visibility
-              integer         samp_aes( max_vis, 2 )
-C         Pair of aerials
-              integer         ae1, ae2
-C         List of aerial system temperatures
-              real            Tsys( max_aes )
-C         Nominal rain gauge value
-              real            nominal_rg
-C         Overall weight of aperture due to rain gauge weighting
-              real            rg_weight
-
 C         UV plane skew angle
               real*8          skew_angle
 C         Map statistics from maplib routine SCNMAP
@@ -108,10 +97,8 @@ C         Map statistics from maplib routine SCNMAP
               integer         posns(4)
 C         Number of gridpoints/wavelength in u and v
               real            uwl2gp, vwl2gp
-C         Map and sample-file fortran logical unit numbers
-              integer         lun, slun
-C         source no in lsf
-              integer         lsf_source
+C         Map fortran logical unit number and default output unit
+              integer         lun
 C         Beam file name, and map name user and type
               character       beam_name*64, user*33, type*4
 C         String and length
@@ -139,7 +126,7 @@ C     Check for non zero entry status
 
 C     Find execution mode
       call io_enqexe( current_user, exe_mode, termno )
-C     Initialise redtape to minimalist values to avoid OPEMAP problems
+C     Initialise redtape to minimalist valuse to avoid OPEMAP problems
       call nwredt( 2, 2, 3, 1, s )
 
 C     Open map and read map redtape.
@@ -148,6 +135,9 @@ C     Open map and read map redtape.
       if ( s .ne. 0 ) goto 9999
 
 C     Check to see that the map dimensions are powers of two.
+c     if ( (nint(2.0**real(nint(alog2(real(ixmax))))) .ne. (ixmax)) .or.
+c    *     (nint(2.0**real(nint(alog2(real(iymax))))) .ne. (iymax)  )  )
+c    *                                                      then
       if ( .not.check2(ixmax) .or. .not.check2(iymax)) then
           s = ILL_REDTAPE
           goto 9999
@@ -180,7 +170,7 @@ C     Initialise timing variables
 
 C     Set up projection parameters.
       if ( iproj .eq. 1 ) then
-C Equatorial projection
+C         Equatorial projection
           uwl2gp = real(ixmax) * usamp * const_sa2r
           vwl2gp = real(iymax) * usamp * const_sa2r
       else if (   iproj.eq.2          .and.
@@ -188,7 +178,7 @@ C Equatorial projection
      *            epoch.eq.obsdat     .and.
      *            -iumap1.eq.iumap2+1 .and.
      *            ivmap1.eq.-ivmap2+1         ) then
-C Standard, central, sky projection
+C         Standard, central, sky projection
           uwl2gp = real(ixmax) * usamp * const_sa2r
           vwl2gp = real(iymax) * usamp * const_sa2r * dsin( decobs )
       else
@@ -211,7 +201,7 @@ C
      *                          uwl2gp, vwl2gp,
      *                          wghttp, wghtpa,
      *                          ibuff(work_ptr),
-     *                          s )
+     *                          s                  )
           call util_rdclck( smoo_cpu, smoo_elapsed )
       end if
 
@@ -220,8 +210,8 @@ C     Initialise aperture and beam aperture arrays.
           rbuff(i) = 0.0
   100 continue
 
-*      call io_wrout( 'Calculating convolution function ...' )
-      call tabfn(convtp, convos, convhw, convpa, max_conv_hw, conv, s)
+      call io_wrout( 'Calculating convolution function ...' )
+      call tabfn( convtp, convos, convhw, convpa, max_conv_hw, conv, s)
       if ( s .ne. 0 ) goto 9999
 
       string(1:)    = 'Gridding'
@@ -230,21 +220,25 @@ C     Initialise aperture and beam aperture arrays.
       do 700, i = 1, numlsf
           call enmlsf( i, file_name, lsf_key, s )
           string(11:26) = file_name
-          call io_wrout( string(1:27) )
-
+          string(28:47) = '>-------------------'
+c         if (exe_mode.eq.0) then
+c           call io_wrout( string )
+c         else
+            call io_wrout( string(1:27) )
+c         end if
           call lsf_open( file_name, lsf_key, 'READ', lsf_num, s )
           call lsf_enq_numbuff( lsf_num, num_buff, s )
           tot_vis = 0
           tot_val = 0
 
-C   Find the effective UV plane skew angle for this LSF
-C - this also sets the phase centre of the LSF
+C         Find the effective UV plane skew angle for this LSF
+C         - this also sets the phase centre of the LSF
           call get_skew_angle( lsf_num, skew_angle, s )
 
-C  If map is a beam-set define model LSF.
+C         If map is a beam-set define model LSF.
           if (maptyp .eq. 3) then
-C  Turn off/on bandwidth smearing and primary beam if necessary.
-C    & integration-time smearing
+C          Turn off/on bandwidth smearing and primary beam if necessary.
+C                 & integration-time smearing
               if (btest(bsetfw,1)) then
                   call lsf_set_bandpass( lsf_num, 1, 0.0, s )
               else
@@ -262,7 +256,7 @@ C    & integration-time smearing
                   call lsf_set_integt( lsf_num,
      *                                 effective_integration, s )
               endif
-C  Add in sources.
+C             Add in sources.
               do 300, u = u0set, u0set+duset*(nuset-1), duset
                   do 200, v = v0set, v0set+dvset*(nvset-1), dvset
                       call uvtord( u, v, ra, dec, s )
@@ -272,43 +266,37 @@ C  Add in sources.
           end if
           if ( s .ne. 0 ) goto 9999
 
-C Look up aerial system temperatures                      (8 May 2000)
-          call lsf_enq_sf(lsf_num, slun, lsf_source, s)
-          call enq_tsys  (slun, Tsys, nominal_rg, s)
-
-C Set up table of aerial pairs for each visibility
-          do 550, j = 1, max_vis
-              call lsf_enq_ae_vis(lsf_num, j, ae1, ae2, s)
-              samp_aes( j, 1 ) = ae1
-              samp_aes( j, 2 ) = ae2
-  550     continue
-
-
-
           do 600, j = 1, num_buff
+c             if ( mod(j, max0(1,int(num_buff/20))) .eq. 0 ) then
+c                 ls = chr_lend( string, '>' )
+c                 string(ls+1:ls+2) = '->'
+c                 if (exe_mode.eq.0) call io_wrout( string )
+c             end if
 
               call lsf_set_buffer( lsf_num, j, s )
               call lsf_get_vis( lsf_num,
      *                          max_vis,
      *                          vis,
      *                          num_vis,
-     *                          s )
+     *                          s          )
               call lsf_get_uv( lsf_num,
      *                         max_vis,
      *                         skew_angle,
      *                         uv,
      *                         num_vis,
-     *                         s )
+     *                         s          )
+c             call user_action(num_vis, vis,
+c    *                         lsf_num, j, num_buff, s )
               if ( s .ne. 0 ) goto 9999
 
               if (maptyp .eq. 3) then
-C  Beamset - get model visibilities.
+C                 Beamset - get model visibilities.
                   call lsf_set_buffer( lsf_num, j, s )
                   call lsf_get_model( lsf_num,
      *                                max_vis,
      *                                model_vis,
      *                                num_vis,
-     *                                s )
+     *                                s          )
               end if
 
 C             Rescale u and v positions
@@ -323,21 +311,9 @@ C             Rescale u and v positions
      *                                rbuff( smooth_ptr ),
      *                                aper_cols, iymax,
      *                                weight,
-     *                                s )
+     *                                s                  )
 
-              call get_rg_weight(     num_vis,
-     &                                 wghttp,
-     &                                 lsf_num,
-     &                                 max_vis,
-     &                                 samp_aes,
-     &                                 Tsys, j,
-     &                                 nominal_rg,
-     &                                 weight,
-     &                                 rg_weight,
-     &                                 s )
-
-
-C Eliminate null visibilities and make beams
+C             Eliminate null visibilities and make beams
               val_vis = 0
               do 500, k = 1, num_vis
                   if ( vis( k ) .ne. ( 0.0, 0.0 ) ) then
@@ -365,7 +341,7 @@ C Eliminate null visibilities and make beams
      *                            convhw, convos, conv, max_conv_hw,
      *                            weight,
      *                            rbuff(beam_ptr),
-     *                            s )
+     *                            s                  )
   600     continue
 
           call lsf_close( lsf_num, s )
@@ -381,67 +357,67 @@ C Eliminate null visibilities and make beams
      *                        uwl2gp, vwl2gp,
      *                        gradtp, gradpa,
      *                        rbuff( beam_ptr ), 1,
-     *                        s )
+     *                        s                        )
       call util_rdclck( int_cpu, int_elapsed )
 
-*      call io_wrout( 'Doing map fft ... ' )
+      call io_wrout( 'Doing map fft ... ' )
       call util_stclck
       call aper2map_fft( cbuff(aper_ptr), aper_cols, iymax, s )
       call util_rdclck( fft_cpu, fft_elapsed )
 
-C Apply the grid correction function and fft scaling correction.
-*      call io_wrout( 'Correcting map ...' )
+C     Apply the grid correction function and fft scaling correction.
+      call io_wrout( 'Correcting map ...' )
       call correct_map(   rbuff(map_ptr), ixmax, iymax,
      *                    convhw, convos, max_conv_hw, conv,
      *                    corrtp, .false., s    )
 
-C Fill in the redtape.
+C     Fill in the redtape.
       call scnmap( rbuff(map_ptr), uvmapw, stats, posns, s )
       call stscal( stats, posns, s )
       call adredt( 'Created', 'mapper', s )
 
-C Finally write the map away...
-*      call io_wrout( 'Writing the map away... ' )
+C     Finally write the map away...
+      call io_wrout( 'Writing the map away... ' )
       call wrredt( lun, 0, s )
       call wrmap( lun, rbuff(map_ptr), s )
       close ( lun )
       if ( s .ne. 0 ) goto 9999
 
       i = chr_lenb(map_name)
-      call io_wrout( 'Map ' // map_name(1:i) // ' has been made' )
+      call io_wrout( 'Map ' // map_name(1:i) // ' has been made.' )
 
-C Now see if a beam file exists.
+C     Now see if a beam file exists.
       call io_brkfil( map_name, user, beam_name, type )
       call io_makfil( user, beam_name, 'beam', file_name, ls )
       call io_namfil( file_name, beam_name, 0, s )
 
       if (s .eq. 0 .and. maptyp.eq.1) then
-C  Beam file exists, make beam.
+C         Beam file exists, make beam.
           do 800, i = 1, aper_size
               cbuff(i) = cmplx(rbuff(beam_ptr+i-1), 0.0)
   800     continue
 
-*          call io_wrout( 'Doing beam fft ... ' )
+          call io_wrout( 'Doing beam fft ... ' )
           call util_stclck
           call aper2map_fft( cbuff(aper_ptr), aper_cols, iymax, s )
           call util_rdclck( cpu, elapsed )
           fft_cpu     = fft_cpu     + cpu
           fft_elapsed = fft_elapsed + elapsed
 
-C Apply the grid correction function and fft scaling correction.
-*          call io_wrout( 'Correcting beam ...' )
+C         Apply the grid correction function and fft scaling correction.
+          call io_wrout( 'Correcting beam ...' )
           call correct_map(   rbuff(map_ptr), ixmax, iymax,
      *                        convhw, convos, max_conv_hw, conv,
      *                        corrtp, .false., s    )
 
-C Fill in the redtape.
+C         Fill in the redtape.
           maptyp = 2
           call scnmap( rbuff(map_ptr), uvmapw, stats, posns, s )
           call stscal( stats, posns, s )
           call adredt( 'Created', 'mapper', s )
 
-C Finally write the map away...
-*          call io_wrout( 'Writing the beam away... ' )
+C         Finally write the map away...
+          call io_wrout( 'Writing the beam away... ' )
           call io_resfil( beam_name, nptot, .true., 0, s )
           call opemap( lun, beam_name, 'WRITE', 1, s )
           call wrredt( lun, 0, s )
@@ -450,19 +426,19 @@ C Finally write the map away...
           if ( s .ne. 0 ) goto 9999
 
           i = chr_lenb(beam_name)
-          call io_wrout('Beam ' // beam_name(1:i) // ' has been made')
+          call io_wrout('Beam ' // beam_name(1:i) // ' has been made.')
       else
           s = 0
       end if
 
-C  Write profiling statistics [suppressed 25 May 2000]
-*      if (smoo_cpu .ne. 0.0)
-*     *write( *,2000 ) 'Smoothing ..... -', smoo_cpu, smoo_elapsed
-*      write( *,2000 ) 'Gridding ...... -', int_cpu, int_elapsed
-*      write( *,2000 ) 'Transforming .. -', fft_cpu, fft_elapsed
-* 2000 format( 1H , 'Times for ', A, ' cpu ',F8.2, ', elapsed',F8.2 )
+C     Write profiling statistics
+      if (smoo_cpu .ne. 0.0)
+     *write( *,2000 ) 'Smoothing ..... -', smoo_cpu, smoo_elapsed
+      write( *,2000 ) 'Gridding ...... -', int_cpu, int_elapsed
+      write( *,2000 ) 'Transforming .. -', fft_cpu, fft_elapsed
+ 2000 format( 1H , 'Times for ', A, ' cpu ',F8.2, ', elapsed',F8.2 )
 
-*      call io_wrout( ' ' )
+      call io_wrout( ' ' )
       call io_wrout( ' ' )
 
       return

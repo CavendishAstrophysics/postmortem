@@ -31,7 +31,7 @@ C  errors (actual minus demanded) are also printed out.
 C
 C  The STATUS value should be zero on entry.
 C
-C  DJT, 9/3/92
+C  DJT, 9/3/92; GP, 11 Aug 03
 C
 *-
        character  file*(*), plot_device*(*)
@@ -78,12 +78,12 @@ c
 c
          elseif (io_yesno(
      :      'Do you want to plot the mean pointing errors?',
-     :                                                'no',status)) then
+     :                                               'yes',status)) then
            option='PLOT'
            errtype=1
          elseif (io_yesno(
      :      'Do you want to plot the mean absolute errors?',
-     :                                                'no',status)) then
+     :                                               'yes',status)) then
            option='PLOT'
            errtype=2
          elseif (io_yesno(
