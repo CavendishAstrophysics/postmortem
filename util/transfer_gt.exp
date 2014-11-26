@@ -1,0 +1,19 @@
+#!/soft/tcl/bin/expect --
+#
+# Expect script to return the list of Ryle Telescope gains table files.
+# Executes the LIST-FILES command on the remote host.
+# Called from the transfer_gt.csh script.
+#
+log_user 0
+set timeout 100
+set host [lrange $argv 0 0]
+set name [lrange $argv 1 1]
+set prompt [string toupper "$host@ "]
+spawn telnet $host
+expect *ENTER {send POSTMORTEM\r}
+expect *PASSWORD: {send TELESCOPE\r}
+expect *$prompt {send "list-files $name terminal\r"}
+expect *$prompt {puts $expect_out(buffer)}
+send LOGOUT\r
+close
+wait

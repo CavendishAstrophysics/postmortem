@@ -1,0 +1,146 @@
+*1 introduction
+
+The MRAO transfer command transfers and converts sample files from
+the NORSK data NORD computers to the Sun cluster.  The transfer
+command can be used either with all options specified on the
+command line or alternatively in command mode.  The transfer
+command will transfer all files associated with a given sample file
+(i.e. cal, rem, flag, lsf, ion files etc.).
+
+For example to recover all files for sample file 064829-060893:S15
+on the clfst machine into "ryle" space on the suns, type:
+
+   transfer -clfst -user ryle -recover 064829-060893
+
+Alternatively you could use the command mode:
+
+   transfer
+   MRAO-transfer> host clfst
+   MRAO-transfer> user ryle
+   MRAO-transfer> recover 064829-060893
+   MRAO-transfer> exit
+
+You may also mix command line options and command mode operation:
+
+   transfer -clfst -user ryle
+   MRAO-transfer> recover 064829-060893
+   MRAO-transfer> exit
+
+There are other command available in command mode to list files,
+recover selected files, and set various options.
+
+*1 recover
+
+Command: recover all matching sample files
+Parameters: sample-file-name
+
+Recover and translate all sample files matching the supplied pattern:
+
+   MRAO-transfer> recover 064829-060893
+
+The command line option -recover sample-file-name has the same effect,
+but in this case you will not exter command mode.
+
+*1 match
+
+Command: match all sample files
+Parameters: sample-file-name
+
+List all sample files matching the supplied pattern
+
+   MRAO-transfer> match 064829-060893
+
+*1 exit
+
+Command: leave command mode and terminate program
+
+The synonyms quit and q also exist.
+
+*1 advanced_commands
+
+*2 sample_list
+
+Command: obtain a list of sample and associated files matching pattern
+Parameters: sample_file_name
+
+A list is returned of the files for all sample files matching the
+name "sample_file_name".  Standard NORD matching is performed on the 
+sample_file_name.
+
+Example:
+   
+   MRAO-transfer> host clfst
+   MRAO-transfer> set flist [sample_list 065535-220493]
+
+Then the tcl list, flist, will contain a list of all matching sample
+files.
+
+*2 get_files
+
+Command: get all files in list of supplied files
+Parameters: file_list
+
+All the files in file_list are transfered and translated from NORD to
+UNIX/SunOS format.  All files associated with a particular sample file
+are collected into a standard Sample-file directory.
+
+Example:
+
+   MRAO-transfer> get_files clfst [sample_list 065535-220493]
+
+will create a directory 065535-220493 in the standard data path (see
+help entry on options), and will place in it all converted files
+(samp, ion, cal, rem etc.).
+
+*1 options
+
+Information: on options for transfer commands.
+
+A number of command exist to set options for the transfer, the host
+option also sets user and path, the user option also set path.  The
+default user and path for each machine are:
+
+  Host      user       path
+  --------------------------------
+  clfst     t151       /data4/t151    [command defaults]
+  ryle      ryle       /data4/ryle
+
+*2 host
+Set the host machine to the ryle or clfst, the default user and
+path are also set by this command to ryle and t151 respectively
+
+   host ryle | clfst  
+
+The command line options -ryle and -clfst or -host ryle | clfst may
+also be used.
+
+*2 user
+
+Set the user on the current host -- the path is also set with this
+command
+
+   user ryle | t151
+
+The command line option -user ryle | t151 may also be used
+
+*2 path
+
+Set the path for the current host / user
+
+  path   full_path_name
+
+The path may also be set with the -path command line option.
+
+*2 lowercase
+
+Set the lower-case forcing option on/off.  By default NORD sample file
+names are set to lower-case on the Suns -- this can be controlled
+with the lowercase command:
+
+   lowercase on | off
+
+or alternatively the -lowercase on | off command line option.
+
+*
+ 
+

@@ -1,0 +1,27 @@
+
+POSTMORTEM
+----------
+
+POSTMORTEM is the visibility data reduction and map making package from
+MRAO, for use with the Ryle and CLFST telescopes at Cambridge.  This
+directory tree contains all the files necessary to build POSTMORTEM,
+provided the standard MRAO libraries and the following third party
+libraries are available:
+
+    PGPLOT	Caltech graph plotting routines
+    SLALIB	Starlink Astrometric routines
+    NAG		Numerical routines
+
+These are distributed with the STARLINK software collection or may
+be obatined separately.
+
+The following directories are present in the directory tree:
+
+  src       ---      source for current version of POSTMORTEM
+  test      ---      source for test version of POSTMORTEM
+  util      ---      utility routines and procedures
+  include   ---      POSTMORTEM include files
+
+The POSTMORTEM executables are in the source directory.
+
+

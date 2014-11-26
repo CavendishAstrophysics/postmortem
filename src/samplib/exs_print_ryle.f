@@ -1,0 +1,246 @@
+C
+C+
+       SUBROUTINE EXS_PRINT_RYLE (OPTION, STATUS)
+C      ------------------------------------------
+C
+C  Prints observing parameters for RYLE sample files.
+C
+C  The STATUS value should be zero on entry.
+C
+C 12 March 99; 13 Apr 2000    GP
+*-
+       CHARACTER  OPTION*(*)
+       INTEGER    STATUS
+C
+       CHARACTER  STRING*60
+       CHARACTER  CHRA*16, CHDEC*16, CDATE*11, LTIME*3
+       character*8 text
+       REAL*8     RAPNT, DECPNT, RA, DEC
+       INTEGER    IDATE(3), IPRINT, IUNIT, PRSEC
+       INTEGER    I, LC, LD, LR, j
+C
+       include '/mrao/include/constants.inc'
+       include '/mrao/include/chrlib_functions.inc'
+       include '/mrao/post/include/control_tables.inc'
+       include '/mrao/post/include/control_tab_v2.inc'
+       include '/mrao/post/include/offset_types.inc'
+C
+       IF (STATUS.NE.0) RETURN
+C
+       CALL io_enqout(IUNIT)
+C
+C  Print observation title
+C
+       WRITE(IUNIT,*)
+       IF (OPTION.EQ.'TITLE') THEN
+         IPRINT=1
+         LTIME='UT'
+         IDATE(1)=IDAT1(1)
+         IDATE(2)=IDAT1(2)
+         IDATE(3)=IDAT1(3)
+         CALL chr_chdate(IDATE,IPRINT,CDATE,LD)
+         IF (IUTIM.EQ.1) LTIME='BST'
+         WRITE(IUNIT,1)SOURCE(1:16),ITIM1(3),ITIM1(2),LTIME,CDATE
+         WRITE(IUNIT,2)NSP,NSAMP,FREQ
+         DO I=1,5
+           LC=CHR_LENB(COMMENT_LINES(I)(1:76))
+           IF (LC.GT.0) THEN
+             IF (I.EQ.1) WRITE(IUNIT,*)
+             WRITE(IUNIT,'(2X,A)')COMMENT_LINES(I)(1:LC)
+           ENDIF
+         ENDDO
+    1    FORMAT(2X,A,'started',2X,I2,'.',I2.2,X,A,2X,A)
+    2    FORMAT('  File contains',I5,' spacings and',I6,' samples'/
+     :          '  1st LO frequency',F8.1,' MHz')
+C
+C  Print observation parameters
+C
+       ELSEIF (OPTION.EQ.'PARAMETERS') THEN
+C
+         WRITE(IUNIT,'(2X,A,2X,A)')
+     :    'Source              :',SOURCE(1:CHR_LENB(SOURCE))
+         WRITE(IUNIT,'(2X,A,2X,A)')
+     :    'Title               :',TITLE(1:CHR_LENB(TITLE))
+         WRITE(IUNIT,'(2X,A,2X,A)')
+     :    'Observer            :',OBSERVER
+         WRITE(IUNIT,'(2X,A,4X,I6)')
+     :    'Number of samples   :',NSAMP
+         WRITE(IUNIT,'(2X,A,4X,I6)')
+     :    'Number of spacings  :',NSP
+         WRITE(IUNIT,'(2X,A,3X,F7.1,A)')
+     :    '1st LO frequency    :',FREQ,' MHz'
+         WRITE(IUNIT,'(2X,A,6X,I4,A)')
+     :    'Integration time    :',INTEGRATION,' secs'
+         WRITE(IUNIT,'(2X,A,3X,F7.1,X,A)')
+     :    'Amplitude cut-off   :',ACHOP*AMPSCL,
+     :                               AUNITS(1:CHR_LENB(AUNITS))
+C
+C    Print map centre (phase centre)
+C
+         PRSEC=3
+         CALL chr_chdtos(RAREF/CONST_H2R,PRSEC,CHRA,LR)
+         CALL chr_chdtos(DECREF/CONST_D2R,PRSEC,CHDEC,LD)
+         WRITE(IUNIT,'(/2X,A,F7.2,2A,X,A)')
+     :   'Map centre (',DATREF,')  ',CHRA(1:LR),CHDEC(1:LD)
+         CALL chr_chdtos(RADATE/CONST_H2R,PRSEC,CHRA,LR)
+         CALL chr_chdtos(DECDATE/CONST_D2R,PRSEC,CHDEC,LD)
+         WRITE(IUNIT,'(2X,A,F7.2,2A,X,A)')
+     :   '           (',DATOBS,')  ',CHRA(1:LR),CHDEC(1:LD)
+C
+C   Print pointing centre
+C
+         PRSEC=3
+         IF (NCENTRE.EQ.1) THEN
+           IF (OFFSET.EQ.4) THEN
+             RAPNT=RADATE-(60.D0*CONST_SA2R*OFFSET_W)/COS(DECDATE)
+             DECPNT=DECDATE+(60.D0*CONST_SA2R*OFFSET_N)
+           ELSE
+             RAPNT=RADATE
+             DECPNT=DECDATE
+           ENDIF
+           CALL chr_chdtos(RAPNT/CONST_H2R,PRSEC,CHRA,LR)
+           CALL chr_chdtos(DECPNT/CONST_D2R,PRSEC,CHDEC,LD)
+           WRITE(IUNIT,'(2X,A,F7.2,2A,X,A)')
+     :     'pointing   (',DATOBS,')  ',CHRA(1:LR),CHDEC(1:LD)
+           IF (OFFSET.EQ.1) THEN
+             WRITE(IUNIT,'(2X,A)') '5-point offset observation'
+           ELSEIF (OFFSET.EQ.2) THEN
+             WRITE(IUNIT,'(2X,A)') 'raster offset observation'
+           ELSEIF (OFFSET.EQ.3) THEN
+             WRITE(IUNIT,'(2X,A)') 'mosaic offset observation'
+           ENDIF
+         ELSEIF (NCENTRE.GT.1) THEN
+           WRITE(IUNIT,*)
+           STRING='pointing'
+           DO I=1,NCENTRE
+             IF (I.EQ.1 .AND. OFFSET.EQ.4) THEN
+               CALL PRECRD(DATREF,RAREF_LIST(I),DECREF_LIST(I),
+     :                                                DATOBS,RA,DEC)
+               RA=RA - (60.D0*CONST_SA2R*OFFSET_W)/COS(DECDATE)
+               DEC=DEC + (60.D0*CONST_SA2R*OFFSET_N)
+               CALL PRECRD(DATOBS,RA,DEC,DATREF,RAPNT,DECPNT)
+             ELSE
+               RAPNT=RAREF_LIST(I)
+               DECPNT=DECREF_LIST(I)
+             ENDIF
+             CALL chr_chdtos(RAPNT/CONST_H2R,PRSEC,CHRA,LR)
+             CALL chr_chdtos(DECPNT/CONST_D2R,PRSEC,CHDEC,LD)
+             WRITE(IUNIT,'(2X,A,2X,A,A,X,A,I5,A)')
+     :         STRING(1:8),SOURCE_LIST(I)(1:12),CHRA(1:LR),CHDEC(1:LD),
+     :                                             TCENTRE(I),' samples'
+             STRING=' '
+           ENDDO
+         ENDIF
+
+* offset run?
+*         call enq_off_tables(sf_lun, offset, offset_aerial,
+*     #                     offset_angle, offset_time,
+*     #                     ha_5point, dec_5point,
+*     #                     offset2Nx, offset2Ny,
+*     #                     offset_zero, offset_row, status)
+
+         if (offset .ne. 0) then
+                 text = '        '
+                   do j = 1,8
+                   if (offset_aerial(j) .eq. 1) then
+                      text(j:j) = char(ichar('0')+j)
+                   endif
+                 enddo
+
+
+                if       (offset .eq. o_5point) then
+
+                        write (iunit, '(1x,a,f4.1,3a)')
+     #                          '5-point offset: angle ',
+     #                           offset_arcmin, ' arcmin ',
+     #                          '  aerials ', text
+                else if  (offset .eq. o_raster) then
+
+                        write (iunit, '(1x,a,a)')
+     #                          'rectangular raster, aerials ',text
+                        write (iunit,
+     #                         '(1x,a,i3,a,i3,a,f5.1,a,a,i3,a,i3,a)')
+     #                          'grid ',2*offset2Nx+1,
+     #                          ' x ',  2*offset2Ny+1,
+     #                          '  step ', offset_arcmin, ' arcmin',
+     #                          ' 1st row: ',offset_row,
+     #                          '   dwell: ',offset_time, ' samples'
+
+                else if (offset .eq. o_7point) then
+                        write (iunit, '(1x,a,f4.1,3a)')
+     #                          '7-point offset: angle ',
+     #                           offset_arcmin, ' arcmin ',
+     #                          '  aerials ', text
+
+                else if (offset .eq. o_const) then
+                        write (iunit, '(1x, a,a,f4.1, a, f4.1, a)')
+     #                          'fixed offset, aerials ',text,
+     #                          offset_W, ' arcmin W, ',
+     #                          offset_N, ' arcmin N'
+
+                else if (offset .eq. o_scan)  then
+                        write (iunit, '(1x, a,a)')
+     #                          'scanned offset, aerials ',text
+
+                else if (offset .eq. o_hex)   then
+                        write (iunit, '(1x,a,a)')
+     #                          'hexagonal raster, aerials ',text
+                        write (iunit,
+     #                        '(1x,a,i3,a,i3,a,f5.1,a,a,i3,a,i3,a)')
+     #                          'grid ',2*offset2Nx+1,
+     #                          ' x ',  2*offset2Ny,
+     #                          '  step ', offset_arcmin, ' arcmin;',
+     #                          ' 1st row: ',offset_row,
+     #                          '   dwell: ',offset_time, ' samples'
+
+                else if (offset .eq. o_m5point) then
+                        write (iunit, '(1x,a,f4.1,3a)')
+     #                          '5-point offset (all centres): angle ',
+     #                           offset_arcmin, ' arcmin ',
+     #                          '  aerials ', text
+
+
+                endif
+         endif
+
+
+C   Print observation start and stop times
+C
+         IPRINT=1
+         LTIME='UT'
+         WRITE(IUNIT,*)
+         IF (IUTIM.EQ.1) LTIME='BST'
+         IDATE(1)=IDAT1(1)
+         IDATE(2)=IDAT1(2)
+         IDATE(3)=IDAT1(3)
+         CALL CHR_CHDATE(IDATE,IPRINT,CDATE,LD)
+         WRITE(STRING,6)ISTIM1(3),ISTIM1(2),ISTIM1(1),
+     :     ITIM1(3),ITIM1(2),LTIME,CDATE
+         WRITE(IUNIT,'(2X,A)')STRING
+         IDATE(1)=IDAT2(1)
+         IDATE(2)=IDAT2(2)
+         IDATE(3)=IDAT2(3)
+         CALL CHR_CHDATE(IDATE,IPRINT,CDATE,LD)
+         WRITE(STRING,6)ISTIM2(3),ISTIM2(2),ISTIM2(1),
+     :     ITIM2(3),ITIM2(2),LTIME,CDATE
+         STRING(1:11)='Stop time .'
+         WRITE(IUNIT,'(2X,A)')STRING
+    6    FORMAT('Start time ',11('.'),2X,2(I2.2,'.'),I2.2,' ST',
+     :     2X,I2.2,'.',I2.2,X,A,2X,A)
+C
+C   Print comment lines, if any
+C
+         DO I=1,5
+           LC=CHR_LENB(COMMENT_LINES(I)(1:76))
+           IF (LC.GT.0) THEN
+             IF (I.EQ.1) WRITE(IUNIT,*)
+             WRITE(IUNIT,'(2X,A)')COMMENT_LINES(I)(1:LC)
+           ENDIF
+         ENDDO
+C
+       ENDIF
+C
+       IF (OPTION.EQ.'PARAMETERS') WRITE(IUNIT,*)
+       WRITE(IUNIT,*)
+C
+       END

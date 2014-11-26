@@ -1,0 +1,97 @@
+C+ENQ_GRP_DESC
+
+       subroutine enq_grp_desc ( lun, merge_type,
+     *                           sp_list, nspac, merge_list,
+     *                           no_groups, group_size, group_num,
+     *                           description, s )
+C
+C     Returns a description for a given merge group.
+C
+C     Given:
+C         Sample file logical unit number
+              integer         lun
+C         The merge type
+              integer         merge_type
+C         Spacing list and length that merge list was derived from.
+              integer         nspac, sp_list(nspac)
+C         Array containing buffer index numbers arranged in merge groups
+              integer         merge_list(*)
+C         Number of groups and array of group sizes.
+              integer         no_groups, group_size(*)
+C         Group number for description
+              integer         group_num
+
+C     Returned:
+C         Character description.
+              character*(*)   description
+C         Status value
+              integer         s
+C
+C  The status value should be zero on entry.
+C
+C-
+      include '/mrao/post/include/merge_types.inc'
+      include '/mrao/post/include/phys_tscopes.inc'
+      include '/mrao/post/include/clfst_constants.inc'
+      include '/mrao/post/include/samplib_errors.inc'
+
+      real            spac_no
+      integer         e_hut, w_hut
+      character*1     huts(8), bands(5)
+      character*4     cspac
+      integer         itscope
+      integer         n, ng, isp, iba, ich, ls
+      data     bands / 'A', 'B', 'C', 'D', 'E' /
+      data     huts  / 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H' /
+
+      if ( s .ne. 0) return
+      call enq_phys_tscope( lun, itscope, s )
+
+C find index to first member of merge list in current group
+      ng = 1
+      do n = 1, group_num-1
+         ng = ng + group_size(n)
+      end do
+
+C find designation for this spacing
+      call enq_vis_desig( lun,sp_list(merge_list(ng)),isp,iba,ich,s )
+      call chr_chitoc( isp,cspac,ls )
+
+      if (itscope.eq.clfst .or. itscope.eq.ryle) then
+          if (merge_type .eq. no_merge) then
+              call enq_spac_no(lun,sp_list(group_num),spac_no,s)
+              write( description, '(X,A,F6.1)' )
+     *            'Spacing ', spac_no
+          else if (merge_type .eq. aerial_merge .or.
+     *             merge_type .eq. west_aerials .or.
+     *             merge_type .eq. east_aerials      ) then
+              write( description, '(X,A,I2)' )
+     *            'Merge of aerial ', group_num
+          else if (merge_type .eq. hut_sw_merge) then
+              e_hut = int((group_num-1)/nwest_huts)+1
+              w_hut = mod( group_num-1, nwest_huts)+1+neast_huts
+              write( description, '(X,A,A1,A,A1)' )
+     *            'Merge of hut ', huts(e_hut), ' vs hut ', huts(w_hut)
+          else if (merge_type .eq. hut_merge) then
+              write( description, '(X,A,A1)' )
+     *            'Merge of hut ', huts(group_num)
+          else if (merge_type .eq. total_merge) then
+              write( description, '(X,A)' )
+     *            'Merge of all spacings'
+          else if (merge_type .eq. subband_merge) then
+              write( description, '(X,A,A)' )
+     *            'Merge over sub-bands.  Spacing ', cspac(1:ls)
+          else if (merge_type .eq. channel_merge) then
+              write( description, '(X,A,A,A,A)' )
+     *            'Merge over channels.  Sp ', cspac(1:ls),
+     *            '  Sb ',bands(iba)
+          else
+              s  =  ill_merge
+          end if
+      else
+          s = ILL_TSCOPE
+      end if
+
+      if (s.ne.0) call smp_wrerr( s, 'in subroutine ENQ_GRP_DESC' )
+
+      end

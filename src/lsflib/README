@@ -1,0 +1,23 @@
+C Logical Sample File Library Routines
+C ------------------------------------
+C
+C Version 2 (for V2-POSTMORTEM)
+C
+C Author, N.P. Rees, Mullard Radio Astronomy Observatory,
+C                    Cavendish Laboratory,
+C                    Cambridge, England.
+C
+C Amended, P. Alexander, PJW
+C
+C Last Updated:
+C
+C   16/8/89:   PA,  additional interference chop type, new routine
+C                   lsf_enq_ae_vis to return aerials for a spacing index
+C   11/4/90:   PA,  changed style of lsf_display output and message from
+C                   lsf_open
+C   19/9/90:   PJW, addition of type 5 interference chop
+C   13/8/91:   PA, major additions to support flag tables
+C   2/10/91:   PJW mods to model handling to improve and generalise
+C   12/2/92:   PJW non-linear interp. of aperture models
+C   8/7/92:    DJT, Unix implementation
+C

@@ -1,0 +1,33 @@
+> gaintables
+ creating file /mrao/post/data/rt/index.data
+ creating file /mrao/post/data/rt/gains.data
+/mrao/post/data/rt/index.data
+
+/mrao/post/data/rt/gains.data
+
+ new files created
+
+/mrao/post/data/rt_gt_file.data
+
+  1068 entries in this file
+  1068 blocks written
+total number of entries:    1068
+
+/mrao/post/data/rt_gt1993.data
+
+  1023 entries in this file
+  1023 blocks written
+total number of entries:    2091
+
+/mrao/post/data/rt_gt1996.data
+
+  1000 entries in this file
+  1000 blocks written
+total number of entries:    3091
+
+/mrao/post/data/rt_gt1999.data
+
+  1001 entries in this file
+  1001 blocks written
+total number of entries:    4092
+>

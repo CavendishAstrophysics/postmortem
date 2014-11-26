@@ -1,0 +1,185 @@
+#
+# Postmortem standard tcl information initialisation 
+#
+
+set global.info(abort) {}
+set global.info(exit) {}
+set global.info(help) {}
+set global.info(news) {}
+set global.info(set-directory) {}
+set global.info(set-display-options) {}
+set global.info(set-plot-device) {}
+set global.info(sidereal-time) {}
+set global.info(print-observation) {}
+set global.info(lsf-system) {}
+set global.info(monitor-system) {}
+set global.info(mapping-system) {}
+set global.info(remove-system) {}
+set global.info(calibration-system) {}
+set global.info(ion-system) {}
+
+
+# post main commands and procedures
+set main.info(exit) {}
+set main.info(set-sample-file) {}
+set main.info(set-lsf) {}
+
+     
+# lsf system commands
+set lsf.info(set-sample-file) {}
+set lsf.info(open-lsf) {}
+set lsf.info(save-lsf) {}
+set lsf.info(print-lsf) {}
+set lsf.info(list-lsfs) {}
+set lsf.info(delete-lsf) {}
+set lsf.info(undelete-lsf) {}
+set lsf.info(select-ion-correction) {}
+set lsf.info(select-calibration) {}
+set lsf.info(select-removes) {}
+set lsf.info(select-flagging) {}
+set lsf.info(interference-chop) {}
+set lsf.info(smoothing) {}
+set lsf.info(averaging) {}
+set lsf.info(shift-phase-centre) {}
+set lsf.info(sampling) {}
+set lsf.info(spacing-list) {}
+set lsf.info(not-spacings) {}
+set lsf.info(display-noise) {}
+set lsf.info(display-histogram) {}
+set lsf.info(display-sample) {}
+set lsf.info(display-spacing) {}
+set lsf.info(display-channel) {}
+set lsf.info(display-TV) {}
+set lsf.info(display-fft) {}
+set lsf.info(display-cont-fft) {}
+set lsf.info(fit-spacings) {}
+set lsf.info(grey-merge) {}
+set lsf.info(merge-spacings) {}
+set lsf.info(model-spacings) {}
+set lsf.info(print-spacings) {}
+set lsf.info(scan-interference) {}
+set lsf.info(scan-sample-file) {}
+set lsf.info(list-spacings) {}
+set lsf.info(print-observation) {}
+set lsf.info(flag-system) {}
+set flag.info(set-flag-file) {}
+set flag.info(list-flag-table) {}
+set flag.info(list-lsf-flagging) {}
+set flag.info(add-entry) {}
+set flag.info(copy-entries) {}
+set flag.info(show-array-status) {}
+
+# monitor system commands
+set mon.info(analyse-holography) {}
+set mon.info(analyse-pointing) {}
+set mon.info(apply-patch) {}
+set mon.info(check-alcs) {}
+set mon.info(check-cryo-temp) {}
+set mon.info(check-parameters) {}
+set mon.info(check-pointing) {}
+set mon.info(check-rain-gauge) {}
+set mon.info(check-wind-gauge) {}
+set mon.info(copy-sample-file) {}
+set mon.info(dump-spacings) {}
+set mon.info(flag-pointing) {}
+set mon.info(log-comment) {}
+set mon.info(print-configuration) {}
+set mon.info(print-geometry) {}
+set mon.info(print-observation) {}
+set mon.info(print-patch-level) {}
+set mon.info(recover-sample-file) {}
+set mon.info(reset-sample-count) {}
+set mon.info(save-sample-file) {}
+set mon.info(set-comment) {}
+set mon.info(set-lsf) {}
+set mon.info(set-sample-file) {}
+
+set mon.info(dump-spacings) {}
+set mon.info(list-spacings) {}
+set mon.info(print-aerial-status) {}
+set mon.info(print-amplitude-factors) {}
+set mon.info(print-phase-corrections) {}
+set mon.info(print-control-tables) {}
+set mon.info(print-hut-status) {}
+set mon.info(print-geometry) {}
+set mon.info(print-observation) {}
+set mon.info(print-sidereal-time) {}
+set mon.info(print-zero-corr) {}
+set mon.info(check-agcs) {}
+set mon.info(check-correlator) {}
+set mon.info(check-interference) {}
+set mon.info(check-pcs) {}
+set mon.info(check-pointing) {}
+set mon.info(recover-sample-file) {}
+set mon.info(reset-sample-count) {}
+set mon.info(scan-aerials) {}
+set mon.info(scan-sample-file) {}
+set mon.info(save-sample-file) {}
+set mon.info(set-lsf) {}
+set mon.info(set-sample-file) {}
+
+
+# map system commands
+set map.info(set-sample-file) {}
+set map.info(set-lsf) {}
+set map.info(open-map) {}
+set map.info(save-map) {}
+set map.info(print-map-redtape) {}
+set map.info(make-map) {}
+set map.info(convolution-func) {}
+set map.info(grading-function) {}
+set map.info(weighting) {}
+set map.info(size) {}
+set map.info(projection) {}
+set map.info(map-centre) {}
+set map.info(uv-centre) {}
+set map.info(type) {}
+set map.info(add-lsf) {}
+set map.info(delete-lsf) {}
+set map.info(plot-functions) {}
+
+
+# rem system commands
+set rem.info(set-sample-file) {}
+set rem.info(set-lsf) {}
+set rem.info(open-remove) {}
+set rem.info(save-remove) {}
+set rem.info(print-remove) {}
+set rem.info(make-remove) {}
+set rem.info(go-remove) {}
+set rem.info(model-source) {}
+
+# cal system commands
+set cal.info(set-sample-file) {}
+set cal.info(set-lsf) {}
+set cal.info(open-calibration) {}
+set cal.info(save-calibration) {}
+set cal.info(calibrator-file) {}
+set cal.info(print-calibration) {}
+set cal.info(make-calibration) {}
+set cal.info(go-calibration) {}
+set cal.info(display-sample) {}
+set cal.info(display-spacing) {}
+set cal.info(model-source) {}
+set cal.info(amplitude-solution) {}
+set cal.info(phase-solution) {}
+set cal.info(bandwidth) {}
+set cal.info(reference-antenna) {}
+set cal.info(solution-monitor) {}
+set cal.info(write-to-gt-file) {}
+set cal.info(delete-gt-record) {}
+set cal.info(update-gains-table) {}
+set cal.info(display-gains-table) {}
+set cal.info(display-vis-gains) {}
+
+
+
+
+
+
+
+
+
+
+
+

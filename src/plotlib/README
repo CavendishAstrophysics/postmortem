@@ -1,0 +1,19 @@
+*$ Plot Library Routines for POSTMORTEM
+*  -------------------------------------
+C
+C   Original Version N.P. Rees
+C
+C   01/06/89, PA:  Plot_mode switch installed for multiple plots
+C   23/08/89, PA:  Plot_scale_type installed for auto-scaling/fixed
+C                  range plots.  Phase plot range now fixed.
+C   06/09/89, PA:  Plot_prompt switch determines whether the default
+C                  plot device is used or the device is always prompted
+C                  for.
+C   15/09/89, PA:  Plot of AMP/PHASE or COS/SIN now controlled only
+C                  by SET-DISPLAY-OPTION sub-option and not by prompt.
+C   14/11/89, PA:  Plot_mode option requesting "Brief" output installed.
+C   10/10/90, PA:  Plot_fit option added and support for plotting fits
+C                  to spacing data for phase.
+C   13/1/92, DJT:  Plot_zeros option added to allow plotting of zero data
+C                  values (these are ignored as bad data by default).
+C

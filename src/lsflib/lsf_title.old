@@ -1,0 +1,141 @@
+C
+C+lsf_title
+C
+      SUBROUTINE lsf_title( lsf_num,
+     *                      sp_list_str,
+     *                      first_buffer,
+     *                      last_buffer,
+     *                      title,
+     *                      s                      )
+
+C
+C     Constructs a string title of a lsf suitable for display headings.
+C
+C     Given:
+C         Logical sample file number.
+              integer             lsf_num
+C         Spacing list string.
+              character*(*)       sp_list_str
+C         First and last buffer on display.
+              integer             first_buffer, last_buffer
+
+C     Returned:
+C         Four lines of display title.
+              character*(80)      title(4)
+C         Status variable - must be zero on entry - otherwise error
+              integer             s
+C
+C     Constructs a title for part of the logical sample file being
+C     displayed. If first_buffer is greater than last_buffer then
+C     the title is for a single sample, first_samp, otherwise it
+C     is for a range of samples.
+C
+C-
+C     ****************************************************************
+C
+C     Function declarations
+C
+      include  '/mrao/include/chrlib_functions.inc'
+
+C     ****************************************************************
+C
+C     Global includes -
+C         ( i.e. Global constant, variable and common declarations )
+C
+      include  '/mrao/include/constants.inc'
+      include  '/mrao/post/include/lsf_definition.inc'
+      include  '/mrao/post/include/lsf_runtime.inc'
+
+C     ****************************************************************
+C
+C     Variables, equivalences and commons
+C         General purpose string, its length, and title string length
+              character*80    string
+              integer         ls, lt
+              integer         i1, i2
+C         Ionospheric correction name
+              character*80    corr_name
+C         Integer array for start and stop times
+              integer         itime(3)
+C         Strings associated with io_system filenames
+              character*80    full_name
+              character*32    name
+
+C     ****************************************************************
+C
+C     Subroutine initialisation
+C
+C     Check for non zero entry status
+      if ( s .ne. 0 ) return
+
+C     The following will also restore the logical sample file,
+C     if it is not already in the common blocks.
+      call lsf_set_buffer( lsf_num, first_buffer, s )
+
+C     ****************************************************************
+C
+C         Main Code
+C         ---------
+C
+      inquire( unit = sf_lun, name = full_name )
+      i2 = chr_ilstc(full_name,'/') - 1
+      i1 = chr_ilstc(full_name(1:i2),'/') + 1
+      name = full_name(i1:i2)
+
+      ls = chr_lenb(name)
+      write( title(1), '(X,3A)')
+     *    name(1:ls), '  centred on  ', source_text
+
+      if ( lsf_ion_key .ne. 0 ) then
+          call enq_ion_name( sf_lun, lsf_ion_num, corr_name, s )
+          string = '  corrected with: '//corr_name
+          ls = chr_lenb( string )
+          lt = chr_lenb( title(1) )
+          title(1)(lt+1:lt+ls+1) = string(1:ls)
+      end if
+
+      ls = chr_lenb( sp_list_str )
+      write( title(2), '(X,2A)' )   'Spacings    : ', sp_list_str(1:ls)
+
+      write( title(3), '(X,A,I4)' ) 'Samples From: ', curr_samp
+      call util_stohms(samp_sid/10,itime)
+      write( string, '(A, 3I3)' ) '  ST: ', itime(3), itime(2), itime(1)
+      ls = chr_lenb( string )
+      lt = chr_lenb( title(3) )
+      title(3)(lt+1:lt+ls+1) = string(1:ls)
+      write( string, '(A, I4)' ) '    LSF buffer number: ', first_buffer
+      ls = chr_lenb( string )
+      lt = chr_lenb( title(3) )
+      title(3)(lt+1:lt+ls+1) = string(1:ls)
+
+      if ( first_buffer .lt. last_buffer ) then
+          call lsf_set_buffer( lsf_num, last_buffer, s )
+          if ( s .ne. 0 ) goto 9999
+
+          write( title(4), '(X,A,I4)' ) '          To: ', curr_samp
+          call util_stohms(samp_sid/10,itime)
+          write( string, '(A, 3I3)' ) '  ST: ', itime(3), itime(2),
+     *                                                    itime(1)
+          ls = chr_lenb( string )
+          lt = chr_lenb( title(4) )
+          title(4)(lt+1:lt+ls+1) = string(1:ls)
+          write(string, '(A, I4)' ) '    LSF buffer number: ',
+     *                              last_buffer
+          ls = chr_lenb( string )
+          lt = chr_lenb( title(4) )
+          title(4)(lt+1:lt+ls+1) = string(1:ls)
+      else
+          title(4) = ' '
+      end if
+
+      return
+
+C     ****************************************************************
+C
+C         Error Handling
+C         --------------
+C
+ 9999 continue
+          call lsf_wrerr( s, 'in subroutine LSF_TITLE' )
+          return
+      end

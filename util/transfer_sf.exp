@@ -1,0 +1,20 @@
+#!/soft/tcl/bin/expect --
+#
+# Expect script to return the list of data files for an observation.
+# Executes the LIST-OBS-FILES utility on the remote host.
+# Called from the transfer.csh script.
+#
+log_user 0
+set timeout 100
+set host [lrange $argv 0 0]
+set user [lrange $argv 1 1]
+set title [lrange $argv 2 2]
+set prompt [string toupper "$host@ "]
+spawn telnet $host
+expect *ENTER {send $user\r}
+expect *PASSWORD: {send TELESCOPE\r}
+expect *$prompt {send "list-obs-files $title terminal\r"}
+expect *$prompt {puts $expect_out(buffer)}
+send LOGOUT\r
+close
+wait

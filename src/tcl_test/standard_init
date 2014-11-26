@@ -1,0 +1,363 @@
+#
+# Postmortem standard tcl initialisation loading all required commands
+#
+# unknown ::: modified unknown to check for matches to compound command names
+#
+#	1. See if the autoload facility can locate the command in a
+#	   Tcl script file.  If so, load it and execute it.
+#       2. Check for a match among defined compound-name commands.
+#	3. See if the command exists as an executable UNIX program.
+#	   If so, "exec" the command.
+#
+proc unknown args {
+    global auto_noexec auto_noload env unknown_pending post_sys
+    set name [lindex $args 0]
+    if ![info exists auto_noload] {
+	#
+	# Make sure we're not trying to load the same proc twice.
+	#
+	if [info exists unknown_pending($name)] {
+	    unset unknown_pending($name)
+	    if ![array size unknown_pending] {
+		unset unknown_pending
+	    }
+	    error "self-referential recursion in \"unknown\" for command \"$name\"";
+	}
+	set unknown_pending($name) pending;
+	set ret [auto_load $name];
+	unset unknown_pending($name);
+	if ![array size unknown_pending] {
+	    unset unknown_pending
+	}
+	if $ret {
+	    return [uplevel $args]
+	}
+    }
+    uplevel interp_command $post_sys $args
+}
+
+
+# interp_command :::: perform compound string matching on commands
+#                     and execute matching commands
+# Parametsrs:
+#   system  ==  post (sub-)system in which commands are searched
+#   args    ==  arguments to pass to command
+#
+# The global command name space is also searched for matches
+#
+proc interp_command {system args} {
+  global   global.commands shellmode
+  upvar #0 $system.commands ca
+  set command [lindex $args 0]
+  set pars [lrange $args 1 [llength $args]]
+  set iamb 0
+  if !$iamb then {
+    if [llength $pars] then {
+      set iamb [eval lcexec ca $command $system.command $pars]
+    } else {
+      set iamb [eval lcexec ca $command $system.command]
+    }
+  }
+  if !$iamb then {
+    if [llength $pars] then {
+      set iamb [eval lcexec global.commands $command global.command $pars]
+    } else {
+      set iamb [eval lcexec global.commands $command global.command]
+    }
+  }
+  if "$iamb > 1" then {
+    puts "*** Ambiguous command"
+    prmatch $command [array names ca]
+    prmatch $command [array names global.commands]
+  } else {
+    if !$iamb then {
+      if $shellmode then {
+        if [auto_execok $command] {
+          return [uplevel post_system \"$command $pars\"]
+        }
+      }
+      puts "*** Unknown command $command"
+    }
+  }
+}
+
+#
+# procedure to define prompt strings
+proc post_prompt {prompt_string} {
+  global tcl_prompt1
+  set tcl_prompt1 "puts -nonewline \"$prompt_string\""
+}
+#
+# Setup default prompt
+post_prompt "Post> "
+
+# redefine system exit command
+rename exit _exit
+
+# define global variables used for post
+global global.commands sysnames post_sys post_parent post_owner shellmode
+global postnames
+  set post_sys main
+  set post_owner main
+  set post_parent none
+  set shellmode 1
+
+# define commands
+# global commands and procedures
+proc global.command {args} { eval post_command $args }
+proc global.exit {args} {
+  global post_sys post_parent postnames
+  post_command $postnames($post_sys) exit
+  if [string match $post_parent main] then {
+    set post_sys main
+    set post_parent none
+  } else {
+    set post_sys $post_parent
+    set post_parent main
+  }
+  uplevel #0 "post_prompt $\{$post_sys.prompt\}"
+}
+
+set global.commands(abort) {_exit}
+set global.commands(exit) {global.exit}
+set global.commands(quit) {global.exit}
+set global.commands(help) {main.help}
+set global.commands(news) {main.news}
+set global.commands(set-directory) {}
+set global.commands(set-display-options) {}
+set global.commands(set-plot-device) {}
+set global.commands(sidereal-time) {}
+set global.commands(print-observation) {}
+set global.commands(lsf-system) {main.system lsf-system}
+set global.commands(monitor-system) {main.system monitor-system}
+set global.commands(mapping-system) {main.system mapping-system}
+set global.commands(remove-system) {main.system remove-system}
+set global.commands(calibration-system) {main.system calibration-system}
+set global.commands(ion-system) {main.system ion-system}
+
+
+proc main.news { } {
+   global Post
+   post_system "help @$Post(newsfile)"
+}
+proc main.help { args } {
+   global Post
+   post_system "help @$Post(helpfile)"
+}
+
+# post main commands and procedures
+set postnames(main) {}
+set main.prompt "Post> "
+set main.commands(exit) {_exit}
+set main.commands(quit) {_exit}
+set main.commands(set-sample-file) {}
+set main.commands(set-lsf) {}
+proc main.command {args} { eval post_command $args }
+proc main.system { sysname args} {
+   global post_sys post_parent sysnames
+   set sys $sysnames($sysname)
+   if [llength $args] then {
+     eval interp_command $sys $args
+   } else {
+     uplevel #0 "post_prompt $\{$sys.prompt\}"
+     set post_parent main
+     set post_sys $sys
+   }
+}
+
+# lsf system commands
+set sysnames(lsf-system) {lsf}
+set postnames(lsf) {lsf-system}
+set lsf.prompt "Lsf> "
+proc lsf.command {args} { eval post_command lsf-system $args }
+set lsf.commands(set-sample-file) {}
+set lsf.commands(open-lsf) {}
+set lsf.commands(save-lsf) {}
+set lsf.commands(print-lsf) {}
+set lsf.commands(list-lsfs) {}
+set lsf.commands(delete-lsf) {}
+set lsf.commands(un-delete-lsf) {}
+set lsf.commands(select-ion-correction) {}
+set lsf.commands(select-calibration) {}
+set lsf.commands(select-removes) {}
+set lsf.commands(select-flagging) {}
+set lsf.commands(interference-chop) {}
+set lsf.commands(smoothing) {}
+set lsf.commands(averaging) {}
+set lsf.commands(shift-phase-centre) {}
+set lsf.commands(sampling) {}
+set lsf.commands(spacing-list) {}
+set lsf.commands(not-spacings) {}
+set lsf.commands(display-noise) {}
+set lsf.commands(display-histogram) {}
+set lsf.commands(display-sample) {}
+set lsf.commands(display-spacing) {}
+set lsf.commands(display-channel) {}
+set lsf.commands(display-TV) {}
+set lsf.commands(display-fft) {}
+set lsf.commands(display-cont-fft) {}
+set lsf.commands(fit-spacings) {}
+set lsf.commands(grey-merge) {}
+set lsf.commands(merge-spacings) {}
+set lsf.commands(model-spacings) {}
+set lsf.commands(print-spacings) {}
+set lsf.commands(scan-interference) {}
+set lsf.commands(scan-sample-file) {}
+set lsf.commands(list-spacings) {}
+set lsf.commands(print-observation) {}
+set lsf.commands(flag-system) {lsf.system flag-system}
+proc lsf.system { sysname args } {
+   global post_sys post_parent post_owner sysnames
+   set sys $sysnames($sysname)
+   set post_owner lsf-system
+   if [llength $args] then {
+     eval interp_command $sys $args
+   } else {
+     uplevel #0 "post_prompt $\{$sys.prompt\}"
+     set post_parent $sysnames(lsf-system)
+     set post_sys $sys
+   }
+}
+
+# define flagging sub-system
+set postnames(flag) {flag-system}
+set sysnames(flag-system) flag
+set flag.prompt "Flagging> "
+proc flag.command {args} { eval post_command lsf-system flag-system $args }
+set flag.commands(set-flag-file) {}
+set flag.commands(list-flag-table) {}
+set flag.commands(list-lsf-flagging) {}
+set flag.commands(add-entry) {}
+set flag.commands(copy-entries) {}
+set flag.commands(show-array-status) {}
+
+# monitor system commands
+set sysnames(monitor-system) {mon}
+set postnames(mon) {monitor-system}
+set mon.prompt "Monitor> "
+proc mon.command {args} { eval post_command monitor-system $args }
+set mon.commands(analyse-holography) {}
+set mon.commands(analyse-pointing) {}
+set mon.commands(apply-patch) {}
+set mon.commands(check-alcs) {}
+set mon.commands(check-cryo-temp) {}
+set mon.commands(check-parameters) {}
+set mon.commands(check-pointing) {}
+set mon.commands(check-rain-gauge) {}
+set mon.commands(check-wind-gauge) {}
+set mon.commands(copy-sample-file) {}
+set mon.commands(dump-spacings) {}
+set mon.commands(flag-pointing) {}
+set mon.commands(log-comment) {}
+set mon.commands(print-configuration) {}
+set mon.commands(print-geometry) {}
+set mon.commands(print-observation) {}
+set mon.commands(print-patch-level) {}
+set mon.commands(recover-sample-file) {}
+set mon.commands(reset-sample-count) {}
+set mon.commands(save-sample-file) {}
+set mon.commands(set-comment) {}
+set mon.commands(set-lsf) {}
+set mon.commands(set-sample-file) {}
+
+set mon.commands(dump-spacings) {}
+set mon.commands(list-spacings) {}
+set mon.commands(print-aerial-status) {}
+set mon.commands(print-amplitude-factors) {}
+set mon.commands(print-phase-corrections) {}
+set mon.commands(print-control-tables) {}
+set mon.commands(print-hut-status) {}
+set mon.commands(print-geometry) {}
+set mon.commands(print-observation) {}
+set mon.commands(print-sidereal-time) {}
+set mon.commands(print-zero-corr) {}
+set mon.commands(check-agcs) {}
+set mon.commands(check-correlator) {}
+set mon.commands(check-interference) {}
+set mon.commands(check-pcs) {}
+set mon.commands(check-pointing) {}
+set mon.commands(recover-sample-file) {}
+set mon.commands(reset-sample-count) {}
+set mon.commands(scan-aerials) {}
+set mon.commands(scan-sample-file) {}
+set mon.commands(save-sample-file) {}
+set mon.commands(set-lsf) {}
+set mon.commands(set-sample-file) {}
+
+
+# map system commands
+set sysnames(mapping-system) {map}
+set postnames(map) {mapping-system}
+set map.prompt "Map> "
+proc map.command {args} { eval post_command mapping-system $args }
+set map.commands(set-sample-file) {}
+set map.commands(set-lsf) {}
+set map.commands(open-map) {}
+set map.commands(save-map) {}
+set map.commands(print-map-redtape) {}
+set map.commands(make-map) {}
+set map.commands(convolution-func) {}
+set map.commands(grading-function) {}
+set map.commands(weighting) {}
+set map.commands(size) {}
+set map.commands(projection) {}
+set map.commands(map-centre) {}
+set map.commands(uv-centre) {}
+set map.commands(type) {}
+set map.commands(add-lsf) {}
+set map.commands(delete-lsf) {}
+set map.commands(plot-functions) {}
+
+
+# rem system commands
+set sysnames(remove-system) {rem}
+set postnames(rem) {remove-system}
+set rem.prompt "Remove> "
+proc rem.command {args} { eval post_command remove-system $args }
+set rem.commands(set-sample-file) {}
+set rem.commands(set-lsf) {}
+set rem.commands(open-remove) {}
+set rem.commands(save-remove) {}
+set rem.commands(print-remove) {}
+set rem.commands(make-remove) {}
+set rem.commands(go-remove) {}
+set rem.commands(model-source) {}
+
+# cal system commands
+set sysnames(calibration-system) {cal}
+set postnames(cal) {calibration-system}
+set cal.prompt "Cal> "
+proc cal.command {args} { eval post_command calibration-system $args }
+set cal.commands(set-sample-file) {}
+set cal.commands(set-lsf) {}
+set cal.commands(open-calibration) {}
+set cal.commands(save-calibration) {}
+set cal.commands(calibrator-file) {}
+set cal.commands(print-calibration) {}
+set cal.commands(make-calibration) {}
+set cal.commands(go-calibration) {}
+set cal.commands(display-sample) {}
+set cal.commands(display-spacing) {}
+set cal.commands(model-source) {}
+set cal.commands(amplitude-solution) {}
+set cal.commands(phase-solution) {}
+set cal.commands(bandwidth) {}
+set cal.commands(reference-antenna) {}
+set cal.commands(solution-monitor) {}
+set cal.commands(write-to-gt-file) {}
+set cal.commands(delete-gt-record) {}
+set cal.commands(update-gains-table) {}
+set cal.commands(display-gains-table) {}
+set cal.commands(display-vis-gains) {}
+
+
+
+
+
+
+
+
+
+
+
+

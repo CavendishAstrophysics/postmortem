@@ -1,0 +1,43 @@
+#!/soft/tcl/bin/expect --
+source /mrao/post/util/transfer.tcl
+proc prompt1 { } {return "MRAO-transfer> "}
+proc prompt2 { } {return "More> "}
+proc help { } {
+  system /mrao/bin/help @/mrao/post/util/transfer.help
+}
+set sflr ""
+set sflm ""
+for {set i 1} {$i < [llength $argv]} {incr i} {
+  set w [lindex $argv $i]
+  case $w in {
+    {-clfst}   { host clfst }
+    {-ryle}    { host ryle }
+    {-user}    { incr i ; set user [lindex $argv $i]
+                 user $user 
+               }
+    {-host}    { incr i ; set host [lindex $argv $i]
+                 host $host
+               }
+    {-lowercase}    
+               { incr i ; set lc [lindex $argv $i]
+                 lowercase $lc
+               }
+    {-path}    { incr i ; set path [lindex $argv $i]
+                 path $path
+               }
+    {-recover} { incr i ; set sflr [lindex $argv $i] }
+    {-match}   { incr i ; set sflm [lindex $argv $i] }
+  }
+}
+if [string length $sflr] then {
+  recover $sflr
+} else {
+  if [string length $sflm] then {
+    match $sflm
+  } else {
+    interpreter
+  }
+}
+exit
+
+

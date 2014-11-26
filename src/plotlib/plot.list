@@ -1,0 +1,15 @@
+plot_begin.o
+plot_complex.o
+plot_data.o
+plot_enqmode.o
+plot_getopts.o
+plot_io_wrerr.o
+plot_metafile.o
+plot_set_fit.o
+plot_setmode.o
+plot_setpage.o
+plot_setscale.o
+plot_setvp.o
+plot_setzeros.o
+pmadvance.o
+vstats.o

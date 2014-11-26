@@ -1,0 +1,8 @@
+This directory contains the conversion programs used when transferring
+sample files and other auxiliary observation files from the ND systems.
+Invoked by the 'transfer' scripts.
+
+  convert_sf   conversion program for sample files, :REM, :CAL files.
+  convert_lsf  conversion program for :LSF files.
+  convert_ion  conversion program for :ION files.
+

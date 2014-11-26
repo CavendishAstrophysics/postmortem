@@ -1,0 +1,4 @@
+08 Mar 99       samplib/exs_print_ryle.f corrected (displaying raster params)
+08 Mar 99       lsfsys/merge_spacings.f check for 1 or less sample
+09 Mar 99       calsys/cal_new_geom.f   removed various diagnostic prints
+12 Mar 99       samplib/exs_print_ryle.f corrected again
