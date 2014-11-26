@@ -22,7 +22,7 @@ C         Status variable - must be zero on entry - otherwise error
 C
 C     Runs through the current logical sample file displaying data
 C     for merged spacings.
-C    last edit: 8 March 1999  GP
+C    last edit: 4 Aug 2005  GP
 C-
 C=======================================================================
 C
@@ -116,19 +116,14 @@ C ---------
 C
       merge_type = total_merge
       call get_merge( sf_lun, 'Merge type : ', '*', merge_type, s )
-      call get_spacings( sf_lun, 'Spacing list : ', 'All',
-     *                   list, sp_list, max_vis, num_spac, s )
-      call lsf_set_spacings( lsf_num, num_spac, sp_list, 2, s )
-      call set_merge( sf_lun, sp_list, num_spac, merge_type,
-     *                merge_list, no_groups, group_size, s  )
+      call get_spacings(sf_lun, 'Spacing list : ', 'All',
+     *                   list, sp_list, max_vis, num_spac, s)
+      call lsf_set_spacings(lsf_num, num_spac, sp_list, 2, s)
+      call set_merge(sf_lun, sp_list, num_spac, merge_type,
+     *                merge_list, no_groups, group_size, s)
 
-  100 call lsf_get_range( lsf_num, first_buff, last_buff, s )
-      if ( s .ne. 0 ) goto 9999
-
-        if (first_buff .ge. last_buff) then
-                write (out, *) 'error in buffer range?'
-                goto 100
-        endif
+  100 call lsf_get_range(lsf_num, first_buff, last_buff, s)
+      if (s .ne. 0) goto 9999
 
       num_buff  = last_buff - first_buff + 1
       min_rate  = max0( 1, int(num_buff/int(max_plot/no_groups)+1) )

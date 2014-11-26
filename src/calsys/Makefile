@@ -12,7 +12,8 @@ INCLUDE_FILES=\
 	/mrao/post/include/cal_common.inc \
 	/mrao/post/include/cal_control.inc \
 	/mrao/post/include/cal_record.inc \
-	/mrao/post/include/cal_solution.inc
+	/mrao/post/include/cal_solution.inc \
+        /mrao/post/include/calib_commands.inc
 
 OBJECT_FILES=\
 	cal_ae_matrix.o cal_calc_soln2.o cal_closure.o \
@@ -21,7 +22,7 @@ OBJECT_FILES=\
 	cal_fiddle_phase.o cal_gt_apply.o cal_gt_delete.o \
 	cal_gt_display.o cal_gt_examine.o cal_gt_excheck.o \
 	cal_gt_init.o cal_gt_noamp.o cal_gt_nophi.o \
-	cal_gt_update.o cal_gt_write.o cal_gtvis_display.o \
+	cal_gt_update.o cal_gt_write.o cal_gtvis_display.o cal_gt_undelete.o \
 	cal_init_calib.o cal_init_soln.o cal_make_calib.o \
 	cal_make_type.o cal_new_geom.o cal_open.o cal_open_lsf.o \
 	cal_save.o \

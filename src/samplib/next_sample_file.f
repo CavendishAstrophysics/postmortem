@@ -15,7 +15,7 @@ C+next_sample_file
 * and s=0; else file_name unchanged and s=-1
 * this version cycles round the list
 
-* 18 May 2004  GP
+* 18 May 2004; 14 Apr 2005  GP
 C-
 
        include  '/mrao/post/include/control_tables.inc'
@@ -29,7 +29,8 @@ C-
 
         character*80    old_file, name
 
-        integer         lun, i, j, k, blocksize, unit, m
+        integer         lun, i, j, k, unit, m
+*       integer         blocksize
 *
         if (s .ne. 0) return
         old_file = file_name
@@ -38,15 +39,15 @@ C-
 
         call open_sf (lun, old_file, 'READ', 0, s)
 
-        if (s .ne. 0) return
-        blocksize = (page*4)
-        call io_operan(lun, old_file, 'READ', blocksize, 0, s)
-
-        if (s .eq. 0) then
+        if (s .ne. 0) goto 9000
+*        blocksize = (page*4)
+*        call io_operan(lun, old_file, 'READ', blocksize, 0, s)
+*
+*        if (s .eq. 0) then
           call read_ct(lun, s)
-        end if
+*        end if
         call close_sf(lun, s)
-        if (s .ne. 0) return
+        if (s .ne. 0) goto 9000
 
         j = chr_ilstc(old_file,      '/') - 1
         k = chr_ilstc(old_file(1:j), '/') + 1
@@ -58,7 +59,7 @@ C-
 
         if (Ncentre .eq. 1) then
             s = -1
-            return
+            goto 9000
         else
             s = -1
             do i = 1, Ncentre
@@ -71,7 +72,7 @@ C-
                   s = 0
                   call io_opefil (unit, '/tmp/RT-sample-file.list',
      *                                  'WRITE', 0, s)
-                  if (s .ne. 0) call io_wrerr(s,' opening temp file')
+                  if (s .ne. 0) goto 9000
                   m = index (file_name, '-')
                   write (unit, '(a)') file_name
                   write (unit, '(a)') file_name(1:m-1)
@@ -81,6 +82,8 @@ C-
                 endif
             enddo
         endif
+        if (s .eq. 0) return
+ 9000   call io_wrerr(s, ' in next_sample_file')
         return
         end
 

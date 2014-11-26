@@ -221,7 +221,7 @@ C      write(1,*)m,vis_buf,x_geom
 
       if ( plot_samp ) then
           call plot_setmode( 'SCALED-PHI', s )
-          call plot_complex( title,
+          call plot_complexN( title,
      *                   'Merge A and phi vs x geometry',
      *                   'x geometry(km)',
      *                    vis_buf,
@@ -229,7 +229,7 @@ C      write(1,*)m,vis_buf,x_geom
      *                    x_geom,
      *                    plot_device,
      *                    plot_type,
-     *                    s               )
+     *                    lsf_num, s)
           buff_num = buff_num+samp_rate
           call plot_setmode( 'NORMAL', s )
       endif

@@ -36,14 +36,14 @@ C     set_flg = 1   - the given list replaces the existing lsf spacing
 C                     list. The value of 'spacings' and 'num_spac' are
 C                     unchanged, except if they contain illegal values.
 C     set_flg = 2   - the list replaces only the runtime version of
-C                     the lsf spacing list. The permenant spacing list
+C                     the lsf spacing list. The permanent spacing list
 C                     is unchanged, and only spacings that are in the
-C                     permenant spacing list are allowed in the runtime
+C                     permanent spacing list are allowed in the runtime
 C                     list. The returned values of 'spacings' and
 C                     'num_spac' are for the runtime list, after vetting
-C                     by the permenant list.
+C                     by the permanent list.
 C     set_flg = 3   - The runtime spacing list is set equal to the
-C                     permenant spacing list and returned in 'spacings'.
+C                     permanent spacing list and returned in 'spacings'.
 C                     The input values of 'spacings' and 'num_spac' are
 C                     irrelevant. In this mode this routine can be used
 C                     as an enquiry routine.

@@ -20,12 +20,12 @@ LIBRARY_FILES=\
 	lsfsys.a \
 	mapsys.a \
 	remsys.a \
-	/mrao/post/src/libmon.a \
-	/mrao/post/src/liblsf.a \
-	/mrao/post/src/libmon.a \
+	/mrao/post/test/libmon.a \
+	/mrao/post/test/liblsf.a \
+	/mrao/post/test/libmon.a \
 	/mrao/lib/libplanet.a \
-	/mrao/post/src/libplot.a \
-	/mrao/post/src/libsamp.a
+	/mrao/post/test/libplot.a \
+	/mrao/post/test/libsamp.a
 
 OBJECT_FILES=\
 	post_main.o block_data.o basic_commands.o \
@@ -46,13 +46,13 @@ postmortem : $(OBJECT_FILES) $(LIBRARY_FILES)
 	monitor_system.o mon_sys_clfst.o mon_sys_ryle.o \
 	mapping_system.o remove_system.o \
 	calsys.a ionsys.a lsfsys.a lsfun1.o mapsys.a remsys.a \
-	-L/mrao/post/src -L/mrao/lib -L/usr/local/lib -L/usr/openwin/lib \
+	-L/mrao/post/test -L/mrao/lib -L/usr/local/lib -L/usr/openwin/lib \
 	-lmon -llsf -lplot -lpg -lsamp -lplanet -lsla -lmap -lfft \
 	-lcmd -lutil -lio -lch \
 	`pgplotlink` -lnag
-	/usr/bin/rm /mrao/post/post_date_link
-	/usr/bin/date > /mrao/post/post_date_link
-	mv postmortem /mrao/bin/post
+	/usr/bin/rm /mrao/post/tpost_date_link
+	/usr/bin/date > /mrao/post/tpost_date_link
+	mv postmortem /mrao/bin/tpost
 
 
 # object for calibration sub-program
@@ -60,7 +60,7 @@ postmortem : $(OBJECT_FILES) $(LIBRARY_FILES)
 calibration : calib_program.o $(OBJECT_FILES) $(LIBRARY_FILES)
 	f77 -o calibration \
 	calib_program.o calsys.a \
-	-L/mrao/post/src -L/mrao/lib -llsf -lsamp -lmap -lplanet -lsla -lnag \
+	-L/mrao/post/test -L/mrao/lib -llsf -lsamp -lmap -lplanet -lsla -lnag \
 	-lcmd -lutil -lio -lch
 	mv calibration $(BINDIR)
 
@@ -69,7 +69,7 @@ calibration : calib_program.o $(OBJECT_FILES) $(LIBRARY_FILES)
 ion_correction : ion_program.o $(OBJECT_FILES) $(LIBRARY_FILES)
 	f77 -o ion_correction \
 	ion_program.o ionsys.a \
-	-L/mrao/post/src -L/mrao/lib -llsf -lsamp -lmap -lplanet -lsla -lnag \
+	-L/mrao/post/test -L/mrao/lib -llsf -lsamp -lmap -lplanet -lsla -lnag \
 	-lfft -lcmd -lutil -lio -lch
 	mv ion_correction $(BINDIR)
 
@@ -78,17 +78,17 @@ ion_correction : ion_program.o $(OBJECT_FILES) $(LIBRARY_FILES)
 mapper : mapping_program.o $(OBJECT_FILES) $(LIBRARY_FILES)
 	f77 -o mapper \
 	mapping_program.o mapsys.a \
-	-L/mrao/post/src -L/mrao/lib -llsf -lsamp -lmap \
+	-L/mrao/post/test -L/mrao/lib -llsf -lsamp -lmap \
 	-lmon -lplanet -lsla -lnag \
 	-lfft -lcmd -lutil -lio -lch
-	mv mapper $(BINDIR)/mapper
+	mv mapper $(BINDIR)/test-mapper
 
 # object for remove sub-program
 
 remove : remove_program.o $(OBJECT_FILES) $(LIBRARY_FILES)
 	f77 -o remove \
 	remove_program.o remsys.a \
-	-L/mrao/post/src -L/mrao/lib -llsf -lsamp -lmap -lplanet -lsla -lnag \
+	-L/mrao/post/test -L/mrao/lib -llsf -lsamp -lmap -lplanet -lsla -lnag \
 	-lcmd -lutil -lio -lch
 	mv remove $(BINDIR)
 
@@ -96,6 +96,12 @@ remove : remove_program.o $(OBJECT_FILES) $(LIBRARY_FILES)
 
 exsamp : exsamp.o
 	f77 -o exsamp exsamp.o \
-	-L/mrao/post/src -L/mrao/lib -lsamp -lmap -lutil -lio -lch
+	-L/mrao/post/test -L/mrao/lib -lsamp -lmap -lutil -lio -lch
 	mv exsamp $(BINDIR)
+
+# object for patch sample file program
+
+patch_sf : patch_sf.o
+	f77 -o patch_sf patch_sf.o \
+	-L/mrao/post/test -L/mrao/lib -lsamp -lmap -lutil -lio -lch
 

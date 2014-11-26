@@ -32,7 +32,7 @@ C define commands available in the solution monitor
        logical       exit_at_end
        parameter    (number_commands = 8)
        character*80  liscom(number_commands), command_line
-       integer      cmd_report, len_cli
+       integer      cmd_report, len_cli, il
        parameter   (cmd_report = 1)
        data liscom(cmd_report)/
      * 'enable-report ....... enable/disable reports on the solution'

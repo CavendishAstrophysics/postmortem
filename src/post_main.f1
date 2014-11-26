@@ -14,7 +14,7 @@ C     N.P. Rees,
 C     P. Alexander,
 C     D.J. Titterington
 C     P.J. Warner
-C last change 6 Aug 2003 GP
+C last change 2 June 2000 GP
 C*
 C ======================================================================
 C
@@ -184,29 +184,6 @@ C .. system initialisation file and prompt
           else if (command .eq. ion_system_cmd) then
               call cmd_setparam('%sub-system','ION',s)
               call ion_system(def_sf, def_lsf, s)
-
-          else if (command .eq. next_sample_file_cmd) then
-              call next_sample_file (def_sf, s)
-              if (s .ne. 0) then
-                call io_wrout (' ... no file available')
-                s = 0
-              else
-                call close_sf (sf_lun, s)
-                new_sf  = def_sf
-                new_lsf = -1
-                call open_sf (sf_lun, new_sf, 'READ', 0, s)
-                if (s .eq. 0) then
-                 call close_sf(sf_lun, s)
-                 def_sf = new_sf
-                 def_lsf = -1
-                 call io_wrout(' ')
-                 call io_wrout(def_sf)
-                 call io_wrout(' ')
-                 call lsf_open(def_sf, def_lsf, 'READ', lsf_num, s)
-                 call lsf_close(lsf_num, s)
-                end if
-              endif
-
 
           else
               ls = chr_lend(cmd_list(command), '.')

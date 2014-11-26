@@ -1,5 +1,5 @@
 # Makefile for the MRAO POSTMORTEM PLOTLIB library
-# 26 Jan 99
+# 26 Jan 99; 10 July 2003
 
 FFLAGC=-u
 FCOMPL=f77
@@ -10,12 +10,11 @@ FCOMPL=f77
 INCLUDE_FILES=\
 
 OBJECT_FILES=\
-	plot_begin.o plot_complex.o plot_complexN.o \
-        plot_data.o \
+	plot_begin.o plot_complex.o plot_data.o \
 	plot_enqmode.o plot_getopts.o plot_set_fit.o \
 	plot_setmode.o plot_setpage.o plot_setscale.o \
 	plot_setvp.o plot_setzeros.o plot_vstats.o \
-	plot_wrerr.o pmadvance.o
+	plot_wrerr.o pmadvance.o plot_complexN.o
 
 # Dependencies for building the object library
 

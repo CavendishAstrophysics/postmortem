@@ -41,10 +41,6 @@ C         Map file unit number
               integer         lun
 C         Number of pages in the map
               integer         num_pages
-C       default map-name extensions
-                character*4     map_type(3)/'map','beam','bset'/
-C       default map directory, derived name
-                character*64    def_dir, full_name
 
 C     ****************************************************************
 C
@@ -71,28 +67,14 @@ C         Logical sample file must be saved
           if ( s .ne. 0 ) goto 9999
       end if
 
-        call enmdir   (def_dir, s)
-
-        call io_makfil (def_dir, map_name, map_type(maptyp), 
-     *                    full_file, length) 
-        call io_getfil('Map file:', '*', full_name, s)
-        call io_nxtlun (lun, s)
-        if (s .ne. 0) goto 9999
-        
-        open (lun,      file = full_name,
-     *                  status = 'UNKNOWN',
-     *                  iostat = s)
-
-c      call getmap( 'Map name : ', '*', map_name, s )
-c      call enmpag( num_pages, s )
+      call getmap( 'Map name : ', '*', map_name, s )
+      call enmpag( num_pages, s )
       rtsflg = 0
-c      call io_resfil( map_name, num_pages, .true., 0, s )
-c      call opemap( lun, map_name, 'WRITE', 1, s )
-
-
-      if (s .eq. 0) then
-          call wrredt(lun, 0, s)
-          close (lun)
+      call io_resfil( map_name, num_pages, .true., 0, s )
+      call opemap( lun, map_name, 'WRITE', 1, s )
+      if ( s .eq. 0 ) then
+          call wrredt( lun, 0, s )
+          close ( lun )
       end if
 
       if (s .ne. 0 .and. s.ne. USR_BREAK) then

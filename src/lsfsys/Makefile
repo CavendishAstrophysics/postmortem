@@ -16,8 +16,8 @@ OBJECT_FILES=\
 	display_spacing.o display_subband.o fit_spacings.o \
 	grey_merge.o \
 	lsf_archive_flux.o lsf_enq_adc.o lsf_fit_adc.o lsf_load_common.o \
-	merge_spacings.o phase_fit.o \
-        print_spacings.o scan_interference.o \
+	merge_spacings.o \
+        phase_fit.o print_spacings.o scan_interference.o \
 	scan_sample_clfst.o scan_sample_ryle.o scan_samples.o
 
 # Dependencies for building the subroutine library

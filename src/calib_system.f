@@ -17,7 +17,7 @@ C         Status variable - must be zero on entry - otherwise error
               integer             s
 C
 C-
-C last changed 15 Jan 99 GP (new-geometry command)
+C last changed 25 June 2001 (undelete-gt-record)
 C
 C     Local constant and variable declarations
 C
@@ -198,6 +198,9 @@ C
 
           else if (command .eq. cal_new_geom_cmd) then
                 call cal_new_geom(def_sf, s)
+
+          else if (command .eq. gt_undelete_cmd) then
+                call cal_gt_undelete(s)
 
           else
               ls = chr_lend( cmd_list(command), '.' )

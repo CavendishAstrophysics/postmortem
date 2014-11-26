@@ -1,4 +1,4 @@
-C
+
 C+map_sel_proj
 C
       SUBROUTINE map_sel_proj ( s )
